@@ -57,6 +57,14 @@ DATE_COLUMNS: dict[TableName, tuple[str, ...]] = {
     "analytic": (),
 }
 
+# Text columns are written with the SAS missing marker, as in the distributed files.
+TEXT_COLUMNS: dict[TableName, tuple[str, ...]] = {
+    "demographics": ("country_name", "language_name"),
+    "daily": (),
+    "rg": (),
+    "analytic": (),
+}
+
 NULLABLE_INT_COLUMNS: dict[TableName, tuple[str, ...]] = {
     "demographics": ("year_of_birth",),
     "daily": (),
@@ -99,6 +107,8 @@ def write_raw(df: pd.DataFrame, path: Path, table: TableName) -> None:
     out = df.copy()
     for col in DATE_COLUMNS[table]:
         out[col] = _format_date(out[col])
+    for col in TEXT_COLUMNS[table]:
+        out[col] = out[col].fillna(".")
     inverse = {v: k for k, v in COLUMNS[table].items()}
     out = out[list(inverse)].rename(columns=inverse)
     out.to_csv(path, sep="\t", index=False, na_rep=RAW_NA)

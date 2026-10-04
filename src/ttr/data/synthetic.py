@@ -8,6 +8,7 @@ window, controls matched on first-deposit date) and the quirks the pipeline must
 - some activity continues after the RG event (must never leak into features)
 - vendor products carry bet counts but no money values
 - some (user, date, product) records are split across two rows
+- zero-bet rows: settlements of earlier bets (negative hold) and empty records
 - a block of controls has missing demographics (the dataset's leakage trap)
 - a few cases have no RG date, or an RG event before any betting activity
 
@@ -60,6 +61,7 @@ class SyntheticSpec:
     p_case_event_before_activity: float = 0.01
     p_control_no_activity: float = 0.01
     p_split_record: float = 0.01
+    p_settlement_row: float = 0.07
 
 
 def _dates_between(
@@ -138,6 +140,28 @@ def _activity_rows(
     df.loc[vendor_rows, ["turnover", "hold"]] = np.nan
     df["user_id"] = user_id
     return df.drop(columns="ramp")
+
+
+def _settlement_rows(
+    rng: np.random.Generator, daily: pd.DataFrame, spec: SyntheticSpec
+) -> pd.DataFrame:
+    """Zero-bet rows a few days after a sportsbook bet: settled wins, or empty records."""
+    sports = daily["product_type"].isin([PRODUCTS["fixed_odds"], PRODUCTS["live_action"]])
+    src = daily[sports & (rng.random(len(daily)) < spec.p_settlement_row)]
+    won = rng.random(len(src)) < 0.4
+    return pd.DataFrame(
+        {
+            "user_id": src["user_id"].to_numpy(),
+            "date": src["date"].to_numpy()
+            + pd.to_timedelta(rng.integers(1, 4, len(src)), unit="D"),
+            "product_type": src["product_type"].to_numpy(),
+            "turnover": 0.0,
+            "hold": np.where(
+                won, -np.round(src["turnover"].to_numpy() * rng.uniform(0.5, 3), 2), 0.0
+            ),
+            "n_bets": 0.0,
+        }
+    )
 
 
 def _split_records(rng: np.random.Generator, daily: pd.DataFrame, p: float) -> pd.DataFrame:
@@ -255,6 +279,8 @@ def generate(spec: SyntheticSpec, cfg: DataConfig) -> dict[str, pd.DataFrame]:
             )
         )
     daily = pd.concat([f for f in frames if not f.empty], ignore_index=True)
+    daily = pd.concat([daily, _settlement_rows(rng, daily, spec)], ignore_index=True)
+    daily = daily[daily["date"] <= DATA_END]
     daily = _split_records(rng, daily, spec.p_split_record)
     daily = daily[["user_id", "date", "product_type", "turnover", "hold", "n_bets"]]
     daily = daily.sort_values(["user_id", "date", "product_type"], kind="stable")
