@@ -114,3 +114,17 @@ def test_cohort_flow(processed: Path) -> None:
     flow = json.loads((processed / "cohort_flow.json").read_text())
     final = flow[-1]
     assert (final["n_cases"], final["n_controls"]) == (2034, 2045)
+
+
+def test_all_27_paper_indices_reproduce(processed: Path, interim: Path) -> None:
+    """Every index in the paper's analytic dataset is reproduced exactly for >= 95% of players."""
+    from ttr.analysis.indices import betting_indices, index_columns
+
+    ours = betting_indices(pd.read_parquet(processed / "daily.parquet"))
+    ref = pd.read_parquet(interim / "analytic.parquet").set_index("user_id")
+    rates = {}
+    for col in index_columns():
+        theirs = ref[col].dropna()
+        mine = ours[col].reindex(theirs.index)
+        rates[col] = ((mine - theirs).abs() <= 0.01 + 1e-4 * theirs.abs()).mean()
+    assert min(rates.values()) >= 0.95, rates
