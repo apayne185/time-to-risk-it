@@ -3,7 +3,7 @@ SYN_RAW := data/raw/synthetic
 SYN_INTERIM := data/interim/synthetic
 SYN_PROCESSED := data/processed/synthetic
 
-.PHONY: help install lint typecheck test check demo ingest clean-data eda landmarks
+.PHONY: help install lint typecheck test check demo ingest clean-data eda landmarks features
 
 help:  ## Show available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -29,6 +29,7 @@ demo:  ## Run the pipeline on synthetic data (no data licence needed)
 	uv run ttr clean --interim-dir $(SYN_INTERIM) --out-dir $(SYN_PROCESSED)
 	uv run ttr eda --processed-dir $(SYN_PROCESSED) --out-dir data/reports/synthetic
 	uv run ttr landmarks --processed-dir $(SYN_PROCESSED)
+	uv run ttr features --processed-dir $(SYN_PROCESSED)
 
 ingest:  ## Ingest the real dataset from data/raw/bwin_rg
 	uv run ttr ingest
@@ -42,3 +43,7 @@ eda: clean-data  ## Replicate the paper and write reports/eda.md with figures
 landmarks: clean-data  ## Build landmark tables for the primary and broad labels
 	uv run ttr landmarks --label primary
 	uv run ttr landmarks --label broad
+
+features: landmarks  ## Build feature tables for the primary and broad labels
+	uv run ttr features --label primary
+	uv run ttr features --label broad
