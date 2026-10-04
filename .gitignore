@@ -1,0 +1,28 @@
+# Licensed data (Transparency Project) — never commit
+data/
+
+# Private planning notes
+PLAN.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Experiment tracking / artifacts
+mlruns/
+mlartifacts/
+models/
+.ipynb_checkpoints/
+
+# Env / editor
+.env
+.vscode/
+.idea/
+.DS_Store
