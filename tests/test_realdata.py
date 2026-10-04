@@ -56,3 +56,61 @@ def test_missing_demographics_only_in_controls(interim: Path) -> None:
     missing = demo["country_name"].isna()
     assert missing.sum() == 167
     assert (demo.loc[missing, "rg_case"] == 0).all()
+
+
+# --- cleaning rules, verified against the paper's analytic dataset ---------------------------
+
+
+@pytest.fixture(scope="module")
+def processed(interim: Path, tmp_path_factory: pytest.TempPathFactory) -> Path:
+    from ttr.data.clean import clean
+
+    out = tmp_path_factory.mktemp("processed")
+    clean(CFG, interim, out)
+    return out
+
+
+def _match_rate(processed: Path, interim: Path, product: int, suffix: str) -> pd.Series:
+    daily = pd.read_parquet(processed / "daily.parquet")
+    ref = pd.read_parquet(interim / "analytic.parquet").set_index("user_id")
+    d = daily[daily["product_type"] == product]
+    bets = d[d["is_bet_day"]].groupby("user_id")
+    ours = pd.DataFrame(
+        {
+            "stakes": bets["turnover"].sum(),
+            "bets": bets["n_bets"].sum(),
+            "days": bets["date"].nunique(),
+            "loss": d.groupby("user_id")["hold"].sum(),
+        }
+    )
+    theirs = ref[
+        [
+            f"sum_stakes_{suffix}",
+            f"sum_bets_{suffix}",
+            f"bettingdays_{suffix}",
+            f"net_loss_{suffix}",
+        ]
+    ].dropna()
+    theirs.columns = ours.columns
+    ours = ours.reindex(theirs.index)
+    return ((ours - theirs).abs() <= 0.01 + 1e-6 * theirs.abs()).mean()
+
+
+@pytest.mark.parametrize(
+    ("product", "suffix", "floor"), [(1, "fixedodds", 0.95), (2, "liveaction", 0.97)]
+)
+def test_cleaning_reproduces_paper_totals(
+    processed: Path, interim: Path, product: int, suffix: str, floor: float
+) -> None:
+    """Summed split records + bet days = n_bets > 0 reproduce the paper's per-player stakes,
+    bet counts and betting days. The residual few percent are unrelated to split records."""
+    rates = _match_rate(processed, interim, product, suffix)
+    assert (rates[["stakes", "bets", "days"]] >= floor).all(), rates.to_dict()
+
+
+def test_cohort_flow(processed: Path) -> None:
+    import json
+
+    flow = json.loads((processed / "cohort_flow.json").read_text())
+    final = flow[-1]
+    assert (final["n_cases"], final["n_controls"]) == (2034, 2045)

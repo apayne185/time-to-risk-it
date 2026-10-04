@@ -57,3 +57,18 @@ def ingest(
     )
     for key, value in asdict(report).items():
         typer.echo(f"{key:>22}: {value}")
+
+
+@app.command()
+def clean(
+    interim_dir: Annotated[Path | None, typer.Option(help="Defaults to configs/data.yaml.")] = None,
+    out_dir: Annotated[Path | None, typer.Option(help="Defaults to configs/data.yaml.")] = None,
+) -> None:
+    """Merge split records, drop empty rows, build the player table and cohort flow."""
+    from ttr.data.clean import clean as run_clean
+
+    for step in run_clean(load_data_config(), interim_dir, out_dir):
+        typer.echo(
+            f"{step.step:>40}: {step.n_players:>5} ({step.n_cases} cases, "
+            f"{step.n_controls} controls)"
+        )
