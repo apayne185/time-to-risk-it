@@ -1,0 +1,21 @@
+# Landmark (scoring-date) design. At each landmark, every eligible player is scored using only
+# activity strictly before it, and followed for `horizon_days` for a qualifying RG event.
+landmarks:
+  first: 2008-11-01
+  last: 2009-10-01
+  every_months: 1
+
+horizon_days: 90
+
+# Operators score active customers: a player is eligible if they placed a bet in this window.
+eligibility_lookback_days: 90
+
+# Temporal splits by landmark date. Each split's outcomes are censored at the next split's
+# first landmark, so no label in an earlier split depends on events in a later one.
+splits:
+  train: {first: 2008-11-01, last: 2009-04-01}
+  validation: {first: 2009-05-01, last: 2009-07-01}
+  test: {first: 2009-08-01, last: 2009-10-01}
+
+# Player-level folds (hash of user_id) for user-disjoint cross-validation within a split.
+n_folds: 5

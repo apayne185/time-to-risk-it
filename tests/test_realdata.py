@@ -128,3 +128,19 @@ def test_all_27_paper_indices_reproduce(processed: Path, interim: Path) -> None:
         mine = ours[col].reindex(theirs.index)
         rates[col] = ((mine - theirs).abs() <= 0.01 + 1e-4 * theirs.abs()).mean()
     assert min(rates.values()) >= 0.95, rates
+
+
+def test_landmark_table_regression(processed: Path) -> None:
+    """Pins the landmark design's output on the real data (ADR 0003)."""
+    from ttr.config import load_landmarks_config
+    from ttr.labels import get_definition
+    from ttr.landmarks import build_landmarks
+
+    lm = build_landmarks(
+        pd.read_parquet(processed / "players.parquet"),
+        pd.read_parquet(processed / "daily.parquet"),
+        CFG,
+        load_landmarks_config(),
+        get_definition("primary"),
+    )
+    assert (len(lm), int(lm["event"].sum()), lm["user_id"].nunique()) == (10_378, 1_680, 1_885)

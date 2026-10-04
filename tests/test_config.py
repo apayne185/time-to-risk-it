@@ -34,3 +34,20 @@ def test_product_families_must_be_disjoint() -> None:
 def test_relative_paths_resolve_to_project_root() -> None:
     cfg = load_data_config()
     assert cfg.resolve(Path("x")).parent == Path(__file__).resolve().parents[1]
+
+
+def test_landmark_splits_must_not_overlap() -> None:
+    from ttr.config import LandmarksConfig
+
+    with pytest.raises(ValidationError, match="overlap"):
+        LandmarksConfig.model_validate(
+            {
+                "landmarks": {"first": date(2008, 11, 1), "last": date(2009, 10, 1)},
+                "horizon_days": 90,
+                "eligibility_lookback_days": 90,
+                "splits": {
+                    "train": {"first": date(2008, 11, 1), "last": date(2009, 5, 1)},
+                    "test": {"first": date(2009, 5, 1), "last": date(2009, 10, 1)},
+                },
+            }
+        )
