@@ -47,8 +47,21 @@ history, including activity **after** the RG event.
 |---|---|
 | Missing values are `" "` in numeric columns and `"."` (SAS) in text columns | `ttr.data.raw` |
 | Turnover/hold are invalid for third-party vendor products and set to missing | Enforced by schema; money features use products 1, 2, 4, 8, 17 only |
-| 53 casino (product 8) rows lose more than they staked | Schema warning; resolved in cleaning |
-| 12,104 rows share a (player, day, product) key with different values | Resolved in cleaning (verified against the analytic dataset) |
+| 53 casino (product 8) rows lose more than they staked | Schema warning; kept (likely settlement of earlier bets) |
+| 12,104 rows share a (player, day, product) key with different values | Split records: summed in cleaning. Reproduces the paper's totals exactly for every player with split records |
+| 72,235 rows have zero bets | 23k are settlements of earlier bets (non-zero hold): kept, but not counted as betting days. 48.6k are empty: dropped |
+| Country names mix country and site (`Greece.BAW`) and are truncated (`Bosnia and Herzego`) | Split into `country` and `site`, names repaired |
 | 167 controls have no country, language, birth year or registration date | **Leakage risk**: missingness alone identifies them as controls. Never use missingness indicators |
-| 3 cases have no RG date; 24 have their RG event before any activity | Excluded from modelling, reported in the cohort flow |
+| 3 cases have no RG date; 31 have no betting day before their RG event; 21 controls never bet | Excluded from modelling, reported in the cohort flow |
 | 572 first RG events are account re-openings after an earlier closure | Prevalent, not incident, cases; excluded under the primary label (`configs/labels.yaml`) |
+
+## Cohort flow
+
+| Step | Players | Cases | Controls |
+|---|---|---|---|
+| All players | 4,134 | 2,068 | 2,066 |
+| Excluding players with no betting activity | 4,113 | 2,068 | 2,045 |
+| Excluding cases without an RG date | 4,110 | 2,065 | 2,045 |
+| Excluding cases with no betting day before the event | **4,079** | **2,034** | **2,045** |
+
+Reproduced by `make clean-data` (written to `data/processed/cohort_flow.json`).
