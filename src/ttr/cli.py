@@ -100,3 +100,40 @@ def eda(
     for r in outputs.results:
         typer.echo(f"{r.name:>14}: AUC {r.cv_auc:.3f}, accuracy {r.cv_accuracy:.1%}")
     typer.echo(f"report: {outputs.report}")
+
+
+@app.command()
+def landmarks(
+    processed_dir: Annotated[
+        Path | None, typer.Option(help="Defaults to configs/data.yaml.")
+    ] = None,
+    label: Annotated[
+        str | None, typer.Option(help="Label definition from configs/labels.yaml.")
+    ] = None,
+) -> None:
+    """Build the landmark table: risk sets, censored outcomes, temporal splits and folds."""
+    import pandas as pd
+
+    from ttr.config import load_labels_config, load_landmarks_config
+    from ttr.labels import get_definition
+    from ttr.landmarks import build_landmarks, summarise
+
+    cfg = load_data_config()
+    src = cfg.resolve(processed_dir or cfg.processed_dir)
+    name = label or load_labels_config().default
+    lm = build_landmarks(
+        pd.read_parquet(src / "players.parquet"),
+        pd.read_parquet(src / "daily.parquet"),
+        cfg,
+        load_landmarks_config(),
+        get_definition(name),
+    )
+    out = src / f"landmarks_{name}.parquet"
+    lm.to_parquet(out, index=False)
+    summary = summarise(lm)
+    summary.to_csv(src / f"landmarks_{name}_summary.csv", index=False)
+    typer.echo(summary.to_string(index=False))
+    typer.echo(
+        f"{len(lm):,} rows, {lm['user_id'].nunique():,} players, "
+        f"{int(lm['event'].sum()):,} events -> {out}"
+    )

@@ -23,3 +23,6 @@ def test_synth_ingest_clean(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     assert (processed / "players.parquet").exists()
+    result = runner.invoke(app, ["landmarks", "--processed-dir", str(processed)])
+    assert result.exit_code == 0, result.output
+    assert (processed / "landmarks_primary.parquet").exists()
