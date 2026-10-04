@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from functools import cache
+from itertools import pairwise
 from pathlib import Path
 from typing import Literal
 
@@ -93,6 +94,43 @@ class LabelsConfig(_Frozen):
         return self
 
 
+class LandmarkDates(_Frozen):
+    first: date
+    last: date
+    every_months: int = 1
+
+    @model_validator(mode="after")
+    def _ordered(self) -> LandmarkDates:
+        if self.first > self.last:
+            raise ValueError("landmarks.first must not be after landmarks.last")
+        if self.every_months < 1:
+            raise ValueError("landmarks.every_months must be >= 1")
+        return self
+
+
+class SplitRange(_Frozen):
+    first: date
+    last: date
+
+
+class LandmarksConfig(_Frozen):
+    landmarks: LandmarkDates
+    horizon_days: int
+    eligibility_lookback_days: int
+    splits: dict[str, SplitRange]
+    n_folds: int = 5
+
+    @model_validator(mode="after")
+    def _splits_ordered(self) -> LandmarksConfig:
+        ranges = list(self.splits.values())
+        for prev, nxt in pairwise(ranges):
+            if prev.last >= nxt.first:
+                raise ValueError("splits must be listed in time order and must not overlap")
+        if self.horizon_days < 1 or self.eligibility_lookback_days < 1:
+            raise ValueError("horizon_days and eligibility_lookback_days must be positive")
+        return self
+
+
 def _read_yaml(path: Path) -> object:
     with path.open() as fh:
         return yaml.safe_load(fh)
@@ -106,3 +144,8 @@ def load_data_config(path: Path = CONFIG_DIR / "data.yaml") -> DataConfig:
 @cache
 def load_labels_config(path: Path = CONFIG_DIR / "labels.yaml") -> LabelsConfig:
     return LabelsConfig.model_validate(_read_yaml(path))
+
+
+@cache
+def load_landmarks_config(path: Path = CONFIG_DIR / "landmarks.yaml") -> LandmarksConfig:
+    return LandmarksConfig.model_validate(_read_yaml(path))
