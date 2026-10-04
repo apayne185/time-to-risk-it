@@ -72,3 +72,31 @@ def clean(
             f"{step.step:>40}: {step.n_players:>5} ({step.n_cases} cases, "
             f"{step.n_controls} controls)"
         )
+
+
+@app.command()
+def eda(
+    processed_dir: Annotated[
+        Path | None, typer.Option(help="Defaults to configs/data.yaml.")
+    ] = None,
+    out_dir: Annotated[Path, typer.Option(help="Where the report and figures go.")] = Path(
+        "reports"
+    ),
+    seed: Annotated[int, typer.Option()] = 0,
+) -> None:
+    """Replicate the paper's DFA and write the exploratory report with figures."""
+    import pandas as pd
+
+    from ttr.analysis.report import build_eda_report
+
+    cfg = load_data_config()
+    src = cfg.resolve(processed_dir or cfg.processed_dir)
+    outputs = build_eda_report(
+        pd.read_parquet(src / "daily.parquet"),
+        pd.read_parquet(src / "players.parquet"),
+        out_dir,
+        seed,
+    )
+    for r in outputs.results:
+        typer.echo(f"{r.name:>14}: AUC {r.cv_auc:.3f}, accuracy {r.cv_accuracy:.1%}")
+    typer.echo(f"report: {outputs.report}")

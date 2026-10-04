@@ -18,7 +18,7 @@ def test_labels_config_loads() -> None:
     cfg = load_labels_config()
     primary = cfg.definitions[cfg.default]
     assert 6 not in primary.event_types  # "heavy complainer" is not a harm event
-    assert 2 in primary.exclude_interventions  # re-openings are prevalent cases
+    assert {2, 16} <= set(primary.exclude_interventions)  # already closed: prevalent cases
 
 
 def test_event_window_must_be_ordered() -> None:

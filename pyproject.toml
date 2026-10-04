@@ -8,12 +8,15 @@ license = { text = "MIT" }
 authors = [{ name = "Anna Payne" }]
 dependencies = [
     "duckdb>=1.1",
+    "lifelines>=0.30.3",
+    "matplotlib>=3.11.2",
     "numpy>=2.0",
     "pandas>=2.2",
     "pandera>=0.22",
     "pyarrow>=17",
     "pydantic>=2.8",
     "pyyaml>=6.0",
+    "scikit-learn>=1.9.1",
     "typer>=0.12",
 ]
 
@@ -54,10 +57,14 @@ mypy_path = "src"
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["pandera.*", "duckdb.*"]
+module = ["pandera.*", "duckdb.*", "sklearn.*", "lifelines.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 markers = ["realdata: requires the licensed bwin dataset in data/raw (skipped in CI)"]
+filterwarnings = [
+    # Raised inside pandas' own Timestamp/Timedelta arithmetic under NumPy 2.4; not actionable here.
+    "ignore:The 'generic' unit for NumPy timedelta is deprecated:DeprecationWarning",
+]
