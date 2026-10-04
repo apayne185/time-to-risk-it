@@ -144,3 +144,25 @@ def test_landmark_table_regression(processed: Path) -> None:
         get_definition("primary"),
     )
     assert (len(lm), int(lm["event"].sum()), lm["user_id"].nunique()) == (10_378, 1_680, 1_885)
+
+
+def test_feature_table_on_real_data(processed: Path) -> None:
+    from ttr.config import load_landmarks_config
+    from ttr.features import FEATURES, build_feature_table
+    from ttr.labels import get_definition
+    from ttr.landmarks import build_landmarks
+
+    daily = pd.read_parquet(processed / "daily.parquet")
+    lm = build_landmarks(
+        pd.read_parquet(processed / "players.parquet"),
+        daily,
+        CFG,
+        load_landmarks_config(),
+        get_definition("primary"),
+    )
+    table = build_feature_table(lm, daily)
+    assert len(table) == len(lm)
+    counts = [f for f in FEATURES if f.startswith(("bet_days_", "casino_days_", "log_stakes"))]
+    assert table[counts].notna().all().all()
+    # every scored player bet in the 90 days before the landmark (eligibility rule)
+    assert (table["bet_days_90d"] >= 1).all()
