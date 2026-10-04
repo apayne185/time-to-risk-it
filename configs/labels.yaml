@@ -1,0 +1,17 @@
+# RG event taxonomy (codebook Appendices 2 and 3). Each definition says which
+# first-RG-events count as the outcome; everything else is excluded from the risk set
+# (prevalent or non-harm cases), not treated as a control.
+definitions:
+  primary:
+    description: >-
+      Harm-onset events: third-party block, account closure, cancelled outpayment,
+      limit change, in-payment block, partial block, problem reported.
+      Re-openings after an earlier closure are prevalent cases and are excluded.
+    event_types: [1, 2, 3, 4, 7, 9, 10]
+    exclude_interventions: [2]
+  broad:
+    description: Every RG event, as in the original paper.
+    event_types: [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13]
+    exclude_interventions: []
+
+default: primary

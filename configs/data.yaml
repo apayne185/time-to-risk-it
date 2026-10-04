@@ -1,0 +1,32 @@
+# Paths and dataset facts for the bwin RG dataset (Gray, LaPlante & Shaffer, 2012).
+raw_dir: data/raw/bwin_rg
+interim_dir: data/interim
+
+files:
+  demographics: "Raw Datset I.Demographics_Gray_LaPlante_PAB_2012.dat"
+  daily: "Raw Datset II.Daily aggregates_Gray_LaPlante_PAB_2012.dat"
+  rg: "Raw Datset III.Responsible gambling details_Gray_LaPlante_PAB_2012.dat"
+  analytic: "AnalyticDataset_Gray_LaPlante_PAB_2012.dat"
+
+# SHA-256 of the files as distributed by The Transparency Project (downloaded 2026-10-04).
+checksums:
+  demographics: 01d1a60939a62faffdaf25901a0d5b9dfdf40bfe0229e92920936ee21d36d710
+  daily: 2a76a46d28bf5410008d03f4809a2aea81365edda828670ad104ac328378f868
+  rg: 042596f18d4d91f2968b2048525907ff1e393388f83a3492109e8c9ee5c77283
+  analytic: a9ba2b61e05979f42ba0f92188867b2689be638654d95e93dfa6ba5e374efcbc
+
+# Cases triggered their first RG intervention inside this window; controls did not.
+event_window:
+  start: 2008-11-02
+  end: 2009-11-30
+
+# Codebook Appendix 1. Turnover/hold are only valid for bwin's own products;
+# third-party vendor products carry bet counts only.
+products:
+  money_valid: [1, 2, 4, 8, 17]
+  families:
+    fixed_odds: [1]
+    live_action: [2]
+    casino: [4, 8, 17]
+    poker: [3, 10]
+    games: [5, 6, 7, 9, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25]
