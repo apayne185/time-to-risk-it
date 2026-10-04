@@ -6,9 +6,11 @@ definitions:
     description: >-
       Harm-onset events: third-party block, account closure, cancelled outpayment,
       limit change, in-payment block, partial block, problem reported.
-      Re-openings after an earlier closure are prevalent cases and are excluded.
+      Players already closed or self-excluded before the event are prevalent cases and are
+      excluded: account re-opened (intervention 2) and account remains closed (16).
+      Both show a six-month near-absence of betting before the event (ADR 0002).
     event_types: [1, 2, 3, 4, 7, 9, 10]
-    exclude_interventions: [2]
+    exclude_interventions: [2, 16]
   broad:
     description: Every RG event, as in the original paper.
     event_types: [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13]
