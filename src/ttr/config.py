@@ -66,6 +66,7 @@ class Products(_Frozen):
 class DataConfig(_Frozen):
     raw_dir: Path
     interim_dir: Path
+    processed_dir: Path
     files: RawFiles
     checksums: Checksums
     event_window: EventWindow

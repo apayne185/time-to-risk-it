@@ -29,3 +29,4 @@ jobs:
         run: |
           uv run ttr synth --out data/raw/synthetic --n-pairs 100
           uv run ttr ingest --raw-dir data/raw/synthetic --out-dir data/interim/synthetic --synthetic
+          uv run ttr clean --interim-dir data/interim/synthetic --out-dir data/processed/synthetic

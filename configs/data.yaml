@@ -1,6 +1,7 @@
 # Paths and dataset facts for the bwin RG dataset (Gray, LaPlante & Shaffer, 2012).
 raw_dir: data/raw/bwin_rg
 interim_dir: data/interim
+processed_dir: data/processed
 
 files:
   demographics: "Raw Datset I.Demographics_Gray_LaPlante_PAB_2012.dat"
