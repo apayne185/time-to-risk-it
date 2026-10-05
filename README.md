@@ -62,6 +62,9 @@ flowchart LR
     bundle --> api["FastAPI<br/>/score · /score/activity"]
     bundle --> batch["ttr score<br/>(batch)"]
     bundle --> mon["ttr monitor<br/>PSI · monthly shift"]
+    bundle --> stream["Kafka consumer<br/>event-time scoring"]
+    events(["bets.daily topic"]) --> stream
+    stream --> scores(["rg.scores topic"])
 ```
 
 Every stage is a `ttr` command and a `make` target; the same pipeline runs on a schema-faithful
@@ -90,7 +93,7 @@ Requires [uv](https://docs.astral.sh/uv/). No data licence needed for the demo.
 ```bash
 make install    # dependencies + git hooks
 make demo       # full pipeline on synthetic data: ingest → … → evaluate → monitor
-make test       # 96 tests; real-data tests skip without the licensed files
+make test       # 102 tests; real-data tests skip without the licensed files
 ```
 
 Serve the demo model and score a player:
@@ -100,6 +103,14 @@ uv run ttr serve --bundle data/models/synthetic/decision_model.joblib
 curl -s localhost:8000/model
 # or in Docker (mounts the model, never bakes it in):
 make docker-demo
+```
+
+Stream it instead: replay betting activity through Redpanda (Kafka API) and score players online
+as each month closes, with features identical to the offline pipeline
+([ADR 0007](docs/decisions/0007-streaming.md)):
+
+```bash
+make stream-demo   # needs Docker; replay → online scoring → rg.scores topic
 ```
 
 With the real data (free registration, see [docs/data.md](docs/data.md)):
@@ -126,7 +137,7 @@ An example response from `POST /score/activity` (raw daily activity in, explaine
 ## Engineering
 
 - **Python 3.12, uv, ruff, mypy `--strict`**, pre-commit hooks running the locked tool versions.
-- **96 tests**: unit, Hypothesis property tests (outcome invariants, feature leakage), end-to-end
+- **102 tests**: unit, Hypothesis property tests (outcome invariants, feature leakage), end-to-end
   pipeline runs on synthetic data, API/batch parity, online/offline feature parity, and real-data
   regression tests that pin reproduction of the published paper.
 - **Data contracts** with pandera; SHA-256 checks on the raw files; a hook blocks licensed data
@@ -136,8 +147,11 @@ An example response from `POST /score/activity` (raw daily activity in, explaine
 - **MLflow** tracking (git SHA and feature-table hash on every run), deterministic retraining.
 - **FastAPI** service with typed request/response schemas, a lean Docker image (training extras
   excluded), and **PSI drift monitoring** with a monthly recalibration job.
-- **GitHub Actions**: lint, types, tests, synthetic end-to-end run, live API smoke test, image
-  build. Work is merged through PRs with required checks.
+- **Streaming**: an event-time Kafka consumer (Redpanda) that scores players online, at-least-once
+  with a dead-letter topic, tested for parity with the offline features and run end to end
+  against a real broker in CI.
+- **GitHub Actions**: lint, types, tests, synthetic end-to-end run, live API smoke test,
+  streaming through Redpanda, image build. Work is merged through PRs with required checks.
 
 ## Repository map
 
@@ -152,6 +166,7 @@ src/ttr/
   evaluate/    weights, calibration, net benefit, capacity, subgroups, report
   explain.py   TreeSHAP / linear contributions, top drivers
   serve/       scoring core and FastAPI app
+  stream/      event schemas, event-time StreamScorer, Kafka adapters
   monitor.py   PSI drift, monthly intercept shift
 configs/       data, labels, landmarks, models, decision policy
 docs/          data access, features, model card, decision records
