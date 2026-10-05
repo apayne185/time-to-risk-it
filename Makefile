@@ -5,7 +5,7 @@ SYN_PROCESSED := data/processed/synthetic
 
 export MLFLOW_DISABLE_AGENT_HINT := 1
 
-.PHONY: help install lint typecheck test check demo ingest clean-data eda landmarks features train evaluate monitor serve docker-build docker-demo stream-demo mlflow-ui
+.PHONY: help install lint typecheck test check demo ingest clean-data eda landmarks features train evaluate monitor serve docker-build docker-demo stream-demo aws-lint mlflow-ui
 
 help:  ## Show available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -14,8 +14,9 @@ install:  ## Install dependencies (incl. training extras) and git hooks
 	uv sync --all-extras
 	uv run pre-commit install
 
-lint:  ## Lint and check formatting
+lint:  ## Lint, check formatting and validate CloudFormation
 	uv run ruff check . && uv run ruff format --check .
+	uv run cfn-lint infra/aws/*.yaml
 
 typecheck:  ## Static type-check
 	uv run mypy src tests
@@ -81,6 +82,9 @@ stream-demo: demo  ## Replay synthetic activity through Redpanda and score it on
 	uv run ttr stream score --players $(SYN_PROCESSED)/players.parquet \
 		--bundle data/models/synthetic/decision_model.joblib
 	uv run ttr stream read --topic rg.scores
+
+aws-lint:  ## Validate the CloudFormation templates offline
+	uv run cfn-lint infra/aws/*.yaml
 
 mlflow-ui:  ## Browse experiment runs
 	uv run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db
