@@ -1,0 +1,18 @@
+# `docker compose up` serves models/primary; `make docker-demo` serves the synthetic model.
+services:
+  api:
+    build: .
+    image: time-to-risk-it:latest
+    ports: ["8000:8000"]
+    environment:
+      TTR_MODEL_BUNDLE: /app/models/${MODEL_NAME:-primary}/decision_model.joblib
+    volumes:
+      - ${MODELS_DIR:-./models}:/app/models:ro
+
+  mlflow:
+    profiles: ["tracking"]
+    image: ghcr.io/mlflow/mlflow:v3.16.1
+    command: mlflow ui --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////mlruns/mlflow.db
+    ports: ["5000:5000"]
+    volumes:
+      - ./mlruns:/mlruns

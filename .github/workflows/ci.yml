@@ -20,7 +20,7 @@ jobs:
         with:
           enable-cache: true
       - name: Install
-        run: uv sync --frozen
+        run: uv sync --frozen --all-extras
       - name: Lint
         run: uv run ruff check . && uv run ruff format --check .
       - name: Type-check
@@ -39,3 +39,19 @@ jobs:
             --family xgb_cox --model-dir data/models/synthetic --report data/reports/synthetic/models.md
           uv run ttr evaluate --processed-dir data/processed/synthetic --model-dir data/models/synthetic \
             --out-dir data/reports/synthetic
+          uv run ttr monitor --processed-dir data/processed/synthetic \
+            --bundle data/models/synthetic/decision_model.joblib --report data/reports/synthetic/monitoring.md
+      - name: Smoke-test the scoring service
+        run: |
+          TTR_MODEL_BUNDLE=data/models/synthetic/decision_model.joblib uv run ttr serve --port 8000 &
+          for i in $(seq 1 30); do curl -sf localhost:8000/health && break; sleep 1; done
+          curl -sf localhost:8000/model
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build scoring image
+        run: docker build -t time-to-risk-it:ci .
+      - name: Image imports the service without training extras
+        run: docker run --rm time-to-risk-it:ci python -c "import ttr.serve.app; import importlib.util as u; assert u.find_spec('mlflow') is None"
