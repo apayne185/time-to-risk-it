@@ -5,7 +5,7 @@ SYN_PROCESSED := data/processed/synthetic
 
 export MLFLOW_DISABLE_AGENT_HINT := 1
 
-.PHONY: help install lint typecheck test check demo ingest clean-data eda landmarks features train mlflow-ui
+.PHONY: help install lint typecheck test check demo ingest clean-data eda landmarks features train evaluate mlflow-ui
 
 help:  ## Show available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -34,6 +34,8 @@ demo:  ## Run the pipeline on synthetic data (no data licence needed)
 	uv run ttr features --processed-dir $(SYN_PROCESSED)
 	uv run ttr train --processed-dir $(SYN_PROCESSED) --family rule_baseline --family xgb_cox \
 		--model-dir data/models/synthetic --report data/reports/synthetic/models.md
+	uv run ttr evaluate --processed-dir $(SYN_PROCESSED) --model-dir data/models/synthetic \
+		--out-dir data/reports/synthetic
 
 ingest:  ## Ingest the real dataset from data/raw/bwin_rg
 	uv run ttr ingest
@@ -55,6 +57,9 @@ features: landmarks  ## Build feature tables for the primary and broad labels
 train: features  ## Select, refit and evaluate all model families (logs to MLflow)
 	uv run ttr train --label primary
 	uv run ttr train --label broad
+
+evaluate: train  ## Decision layer: calibration, net benefit, capacity, subgroups
+	uv run ttr evaluate --label primary
 
 mlflow-ui:  ## Browse experiment runs
 	uv run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db

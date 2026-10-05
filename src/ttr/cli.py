@@ -208,3 +208,43 @@ def train(
             f"test C {r.test.c_within_landmark:.3f} "
             f"({r.test_ci[0]:.3f}-{r.test_ci[1]:.3f})"
         )
+
+
+@app.command()
+def evaluate(
+    processed_dir: Annotated[
+        Path | None, typer.Option(help="Defaults to configs/data.yaml.")
+    ] = None,
+    label: Annotated[
+        str | None, typer.Option(help="Label definition from configs/labels.yaml.")
+    ] = None,
+    model_dir: Annotated[Path | None, typer.Option(help="Defaults to models/<label>.")] = None,
+    out_dir: Annotated[Path, typer.Option(help="Report and figures.")] = Path("reports"),
+) -> None:
+    """Decision layer: calibrated 30-day risk, net benefit, capacity, subgroups, drivers."""
+    import pandas as pd
+
+    from ttr.config import PROJECT_ROOT, load_decision_config, load_labels_config
+    from ttr.evaluate.report import write_report
+    from ttr.evaluate.run import run_evaluation, save_decision_bundle
+
+    cfg = load_data_config()
+    dcfg = load_decision_config()
+    src = cfg.resolve(processed_dir or cfg.processed_dir)
+    name = label or load_labels_config().default
+    mdir = model_dir or PROJECT_ROOT / "models" / name
+    result = run_evaluation(
+        pd.read_parquet(src / f"features_{name}.parquet"),
+        pd.read_parquet(src / "players.parquet"),
+        mdir,
+        dcfg,
+    )
+    bundle = save_decision_bundle(result, mdir, dcfg, name)
+    report = write_report(result, dcfg, out_dir, mdir, name)
+    ev = result.evaluations[result.decision_family]
+    cap = ev.recall_at(dcfg.headline_capacity_share)
+    typer.echo(
+        f"decision model: {result.decision_family} (test AUC {ev.test_auc:.3f}); "
+        f"top {dcfg.headline_capacity_share:.1%} reaches {cap:.0%} of next-month cases"
+    )
+    typer.echo(f"bundle: {bundle}\nreport: {report}")

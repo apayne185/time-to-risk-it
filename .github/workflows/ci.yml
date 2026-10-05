@@ -37,3 +37,5 @@ jobs:
           uv run ttr features --processed-dir data/processed/synthetic
           uv run ttr train --processed-dir data/processed/synthetic --family rule_baseline \
             --family xgb_cox --model-dir data/models/synthetic --report data/reports/synthetic/models.md
+          uv run ttr evaluate --processed-dir data/processed/synthetic --model-dir data/models/synthetic \
+            --out-dir data/reports/synthetic
