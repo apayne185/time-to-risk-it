@@ -5,6 +5,8 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+        # CloudFormation short-form tags (!Sub, !GetAtt) are not plain YAML; cfn-lint checks them.
+        exclude: ^infra/aws/
       - id: check-added-large-files
         args: ["--maxkb=1024"]
   # Lint/format with the project's locked tool versions so hooks, CI and editors agree.
@@ -20,6 +22,11 @@ repos:
         entry: uv run --frozen ruff format
         language: system
         types: [python]
+      - id: cfn-lint
+        name: cfn-lint
+        entry: uv run --frozen cfn-lint
+        language: system
+        files: ^infra/aws/.*\.ya?ml$
       - id: no-raw-data
         name: block licensed data files
         entry: "Licensed data must never be committed"
