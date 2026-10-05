@@ -139,3 +139,28 @@ def consume_and_score(
     if dead_letters:
         log.warning("%d malformed messages sent to %s", dead_letters, DLQ_TOPIC)
     return processor.stats
+
+
+def read_topic(bootstrap: str, topic: str, idle_seconds: float = 5.0) -> list[bytes]:
+    """All messages currently on ``topic`` (for inspection and CI checks)."""
+    consumer = Consumer(
+        {
+            "bootstrap.servers": bootstrap,
+            "group.id": f"ttr-reader-{time.time()}",
+            "auto.offset.reset": "earliest",
+            "enable.auto.commit": False,
+        }
+    )
+    consumer.subscribe([topic])
+    out: list[bytes] = []
+    last = time.monotonic()
+    try:
+        while time.monotonic() - last < idle_seconds:
+            msg = consumer.poll(1.0)
+            if msg is None or msg.error():
+                continue
+            out.append(msg.value() or b"")
+            last = time.monotonic()
+    finally:
+        consumer.close()
+    return out
