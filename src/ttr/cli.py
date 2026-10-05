@@ -137,3 +137,35 @@ def landmarks(
         f"{len(lm):,} rows, {lm['user_id'].nunique():,} players, "
         f"{int(lm['event'].sum()):,} events -> {out}"
     )
+
+
+@app.command()
+def features(
+    processed_dir: Annotated[
+        Path | None, typer.Option(help="Defaults to configs/data.yaml.")
+    ] = None,
+    label: Annotated[
+        str | None, typer.Option(help="Label definition from configs/labels.yaml.")
+    ] = None,
+    docs: Annotated[bool, typer.Option(help="Only regenerate docs/features.md.")] = False,
+) -> None:
+    """Compute model features for every landmark row (activity strictly before it)."""
+    from ttr.config import PROJECT_ROOT, load_labels_config
+    from ttr.features import FEATURES, build_feature_table, write_feature_docs
+
+    if docs:
+        typer.echo(f"wrote {write_feature_docs(PROJECT_ROOT / 'docs' / 'features.md')}")
+        return
+
+    import pandas as pd
+
+    cfg = load_data_config()
+    src = cfg.resolve(processed_dir or cfg.processed_dir)
+    name = label or load_labels_config().default
+    table = build_feature_table(
+        pd.read_parquet(src / f"landmarks_{name}.parquet"),
+        pd.read_parquet(src / "daily.parquet"),
+    )
+    out = src / f"features_{name}.parquet"
+    table.to_parquet(out, index=False)
+    typer.echo(f"{len(table):,} rows x {len(FEATURES)} features -> {out}")

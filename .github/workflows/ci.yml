@@ -32,3 +32,4 @@ jobs:
           uv run ttr clean --interim-dir data/interim/synthetic --out-dir data/processed/synthetic
           uv run ttr eda --processed-dir data/processed/synthetic --out-dir data/reports/synthetic
           uv run ttr landmarks --processed-dir data/processed/synthetic
+          uv run ttr features --processed-dir data/processed/synthetic
