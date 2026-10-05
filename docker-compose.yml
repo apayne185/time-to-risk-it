@@ -1,4 +1,5 @@
-# `docker compose up` serves models/primary; `make docker-demo` serves the synthetic model.
+# `docker compose up` serves models/primary; `make docker-demo` serves the synthetic model;
+# `make stream-demo` adds a Redpanda broker (profile: streaming).
 services:
   api:
     build: .
@@ -16,3 +17,20 @@ services:
     ports: ["5000:5000"]
     volumes:
       - ./mlruns:/mlruns
+
+  redpanda:
+    profiles: ["streaming"]
+    image: docker.redpanda.com/redpandadata/redpanda:v26.2.3
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+    ports: ["19092:19092"]
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health", "--exit-when-healthy"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
