@@ -15,8 +15,8 @@ jobs:
     env:
       MLFLOW_DISABLE_AGENT_HINT: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - name: Install
@@ -42,15 +42,19 @@ jobs:
           uv run ttr monitor --processed-dir data/processed/synthetic \
             --bundle data/models/synthetic/decision_model.joblib --report data/reports/synthetic/monitoring.md
       - name: Smoke-test the scoring service
+        # Run the venv's entry point directly and always stop it: a lingering `uv run` process
+        # holds uv's cache lock and breaks setup-uv's post-job cache prune.
         run: |
-          TTR_MODEL_BUNDLE=data/models/synthetic/decision_model.joblib uv run ttr serve --port 8000 &
+          TTR_MODEL_BUNDLE=data/models/synthetic/decision_model.joblib .venv/bin/ttr serve --port 8000 &
+          SERVER=$!
+          trap 'kill $SERVER' EXIT
           for i in $(seq 1 30); do curl -sf localhost:8000/health && break; sleep 1; done
           curl -sf localhost:8000/model
 
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build scoring image
         run: docker build -t time-to-risk-it:ci .
       - name: Image imports the service without training extras
