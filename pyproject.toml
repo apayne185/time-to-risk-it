@@ -28,6 +28,10 @@ train = [
     "matplotlib>=3.11.2",
     "mlflow>=3.16.1",
 ]
+# Kafka (Redpanda) streaming: replay producer and online scoring consumer.
+stream = [
+    "confluent-kafka>=2.15.1",
+]
 
 [project.scripts]
 ttr = "ttr.cli:app"
@@ -71,7 +75,7 @@ mypy_path = "src"
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["pandera.*", "duckdb.*", "sklearn.*", "lifelines.*", "scipy.*", "joblib.*"]
+module = ["pandera.*", "duckdb.*", "sklearn.*", "lifelines.*", "scipy.*", "joblib.*", "confluent_kafka.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
