@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -45,7 +46,7 @@ from ttr.evaluate.subgroups import attach_groups, subgroup_table
 from ttr.evaluate.weights import case_control_weights
 from ttr.explain import contributions, global_importance
 from ttr.models.base import SurvivalData, SurvivalModel
-from ttr.train import build_model
+from ttr.train import _git_sha, build_model
 
 log = logging.getLogger(__name__)
 
@@ -313,6 +314,9 @@ def save_decision_bundle(
             "threshold": result.threshold_at_headline,
         },
         "label": label,
+        "intercept_shift": float(result.rolling_shifts["logit_shift"].iloc[-1]),
+        "git_sha": _git_sha(),
+        "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }
     path = model_dir / "decision_model.joblib"
     joblib.dump(bundle, path)
