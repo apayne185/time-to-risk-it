@@ -1,0 +1,26 @@
+# Model families and the hyperparameter grids searched on the validation split.
+horizon_days: 90
+selection_metric: c_within_landmark
+bootstrap_reps: 200
+
+families:
+  rule_baseline:
+    grid: {}
+  cox:
+    grid:
+      penalizer: [0.01, 0.05, 0.2]
+      l1_ratio: [0.0, 0.5]
+  xgb_cox:
+    grid:
+      max_depth: [2, 3, 4]
+      min_child_weight: [10, 50]
+  xgb_aft:
+    grid:
+      max_depth: [2, 3, 4]
+      min_child_weight: [10, 50]
+      sigma: [0.7, 1.2]
+
+mlflow:
+  experiment: time-to-risk-it
+  tracking_uri: sqlite:///mlruns/mlflow.db
+  artifact_location: mlruns/artifacts

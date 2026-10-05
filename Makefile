@@ -3,7 +3,9 @@ SYN_RAW := data/raw/synthetic
 SYN_INTERIM := data/interim/synthetic
 SYN_PROCESSED := data/processed/synthetic
 
-.PHONY: help install lint typecheck test check demo ingest clean-data eda landmarks features
+export MLFLOW_DISABLE_AGENT_HINT := 1
+
+.PHONY: help install lint typecheck test check demo ingest clean-data eda landmarks features train mlflow-ui
 
 help:  ## Show available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -30,6 +32,8 @@ demo:  ## Run the pipeline on synthetic data (no data licence needed)
 	uv run ttr eda --processed-dir $(SYN_PROCESSED) --out-dir data/reports/synthetic
 	uv run ttr landmarks --processed-dir $(SYN_PROCESSED)
 	uv run ttr features --processed-dir $(SYN_PROCESSED)
+	uv run ttr train --processed-dir $(SYN_PROCESSED) --family rule_baseline --family xgb_cox \
+		--model-dir data/models/synthetic --report data/reports/synthetic/models.md
 
 ingest:  ## Ingest the real dataset from data/raw/bwin_rg
 	uv run ttr ingest
@@ -47,3 +51,10 @@ landmarks: clean-data  ## Build landmark tables for the primary and broad labels
 features: landmarks  ## Build feature tables for the primary and broad labels
 	uv run ttr features --label primary
 	uv run ttr features --label broad
+
+train: features  ## Select, refit and evaluate all model families (logs to MLflow)
+	uv run ttr train --label primary
+	uv run ttr train --label broad
+
+mlflow-ui:  ## Browse experiment runs
+	uv run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db
