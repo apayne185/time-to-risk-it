@@ -113,6 +113,9 @@ as each month closes, with features identical to the offline pipeline
 make stream-demo   # needs Docker; replay → online scoring → rg.scores topic
 ```
 
+Deploy to AWS (ECS Fargate behind an ALB, model bundle from S3, GitHub OIDC deploys; templates
+validated offline, not yet run in a live account): see **[docs/deploy-aws.md](docs/deploy-aws.md)**.
+
 With the real data (free registration, see [docs/data.md](docs/data.md)):
 
 ```bash
@@ -147,11 +150,15 @@ An example response from `POST /score/activity` (raw daily activity in, explaine
 - **MLflow** tracking (git SHA and feature-table hash on every run), deterministic retraining.
 - **FastAPI** service with typed request/response schemas, a lean Docker image (training extras
   excluded), and **PSI drift monitoring** with a monthly recalibration job.
+- **AWS**: CloudFormation for ECS Fargate + ALB, a private versioned model bucket, readiness-gated
+  rolling deploys with automatic rollback, autoscaling and alarms, deployed through GitHub OIDC
+  with no stored keys ([ADR 0008](docs/decisions/0008-aws-deployment.md)).
 - **Streaming**: an event-time Kafka consumer (Redpanda) that scores players online, at-least-once
   with a dead-letter topic, tested for parity with the offline features and run end to end
   against a real broker in CI.
 - **GitHub Actions**: lint, types, tests, synthetic end-to-end run, live API smoke test,
-  streaming through Redpanda, image build. Work is merged through PRs with required checks.
+  streaming through Redpanda, CloudFormation lint, image build; a manual, approved AWS deploy
+  workflow. Work is merged through PRs with required checks.
 
 ## Repository map
 
@@ -169,6 +176,7 @@ src/ttr/
   stream/      event schemas, event-time StreamScorer, Kafka adapters
   monitor.py   PSI drift, monthly intercept shift
 configs/       data, labels, landmarks, models, decision policy
+infra/aws/     CloudFormation: foundation, GitHub OIDC deploy access, scoring service
 docs/          data access, features, model card, decision records
 reports/       generated reports and figures
 ```
