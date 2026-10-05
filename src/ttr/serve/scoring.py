@@ -15,6 +15,24 @@ from ttr.explain import contributions, top_drivers
 from ttr.features import FEATURES
 
 
+def fetch_bundle(location: str | Path, cache_dir: Path | None = None) -> Path:
+    """Local path, or ``s3://bucket/key`` downloaded to ``cache_dir`` (needs the aws extra)."""
+    loc = str(location)
+    if not loc.startswith("s3://"):
+        return Path(loc)
+    import tempfile
+
+    import boto3
+
+    bucket, _, key = loc.removeprefix("s3://").partition("/")
+    if not bucket or not key:
+        raise ValueError(f"not an s3://bucket/key URI: {loc}")
+    target = (cache_dir or Path(tempfile.gettempdir()) / "ttr-bundles") / Path(key).name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    boto3.client("s3").download_file(bucket, key, str(target))
+    return target
+
+
 @dataclass
 class Scorer:
     """Wraps a decision bundle: model, recalibration, monthly intercept shift and policy."""
