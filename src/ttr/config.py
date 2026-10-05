@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import date
 from functools import cache
 from itertools import pairwise
@@ -11,7 +12,8 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, model_validator
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+# Source checkout by default; installed copies (e.g. the Docker image) set TTR_PROJECT_ROOT.
+PROJECT_ROOT = Path(os.environ.get("TTR_PROJECT_ROOT", Path(__file__).resolve().parents[2]))
 CONFIG_DIR = PROJECT_ROOT / "configs"
 
 TableName = Literal["demographics", "daily", "rg", "analytic"]
