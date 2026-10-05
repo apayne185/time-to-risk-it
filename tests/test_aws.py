@@ -58,9 +58,11 @@ def test_service_loads_bundle_from_s3(s3: None) -> None:
     with TestClient(create_app(f"s3://{BUCKET}/{KEY}")) as client:
         assert client.get("/health").json()["model_loaded"] is True
         assert client.get("/model").json()["family"] == "xgb_cox"
+        assert client.get("/ready").json() == {"status": "ready"}
 
 
 def test_service_stays_up_when_s3_object_is_missing(s3: None) -> None:
     with TestClient(create_app(f"s3://{BUCKET}/missing.joblib")) as client:
         assert client.get("/health").json() == {"status": "ok", "model_loaded": False}
         assert client.get("/model").status_code == 503
+        assert client.get("/ready").status_code == 503

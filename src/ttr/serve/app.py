@@ -3,6 +3,7 @@
 Endpoints:
 
 - ``GET /health``: liveness, and whether a model is loaded.
+- ``GET /ready``: readiness (503 until a model is loaded), for load-balancer health checks.
 - ``GET /model``: model metadata, policy threshold and the active intercept shift.
 - ``POST /score``: score players from precomputed features (the feature pipeline's output).
 - ``POST /score/activity``: compute features from raw daily activity, then score. Uses the same
@@ -142,6 +143,12 @@ def create_app(bundle_path: Path | str | None = None) -> FastAPI:
     @app.get("/health")
     def health(request: Request) -> dict[str, Any]:
         return {"status": "ok", "model_loaded": request.app.state.scorer is not None}
+
+    @app.get("/ready")
+    def ready(request: Request) -> dict[str, str]:
+        """Readiness for load balancers: 503 until a model is loaded."""
+        scorer(request)
+        return {"status": "ready"}
 
     @app.get("/model")
     def model_info(request: Request) -> dict[str, Any]:
