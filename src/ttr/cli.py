@@ -169,3 +169,42 @@ def features(
     out = src / f"features_{name}.parquet"
     table.to_parquet(out, index=False)
     typer.echo(f"{len(table):,} rows x {len(FEATURES)} features -> {out}")
+
+
+@app.command()
+def train(
+    processed_dir: Annotated[
+        Path | None, typer.Option(help="Defaults to configs/data.yaml.")
+    ] = None,
+    label: Annotated[
+        str | None, typer.Option(help="Label definition from configs/labels.yaml.")
+    ] = None,
+    family: Annotated[
+        list[str] | None, typer.Option(help="Only these model families (repeatable).")
+    ] = None,
+    model_dir: Annotated[Path | None, typer.Option(help="Defaults to models/<label>.")] = None,
+    report: Annotated[
+        Path | None, typer.Option(help="Defaults to reports/models_<label>.md.")
+    ] = None,
+) -> None:
+    """Select, refit and evaluate survival models; log runs to MLflow."""
+    from ttr.config import PROJECT_ROOT, load_labels_config, load_models_config
+    from ttr.train import train_all
+
+    cfg = load_data_config()
+    src = cfg.resolve(processed_dir or cfg.processed_dir)
+    name = label or load_labels_config().default
+    results = train_all(
+        src / f"features_{name}.parquet",
+        name,
+        load_models_config(),
+        model_dir or PROJECT_ROOT / "models" / name,
+        report or PROJECT_ROOT / "reports" / f"models_{name}.md",
+        families=family,
+    )
+    for r in results:
+        typer.echo(
+            f"{r.family:>14}: val C {r.validation.c_within_landmark:.3f} | "
+            f"test C {r.test.c_within_landmark:.3f} "
+            f"({r.test_ci[0]:.3f}-{r.test_ci[1]:.3f})"
+        )

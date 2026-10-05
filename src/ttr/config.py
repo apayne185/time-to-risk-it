@@ -131,6 +131,24 @@ class LandmarksConfig(_Frozen):
         return self
 
 
+class ModelFamily(_Frozen):
+    grid: dict[str, list[float | int | str]] = {}
+
+
+class MLflowConfig(_Frozen):
+    experiment: str
+    tracking_uri: str
+    artifact_location: str
+
+
+class ModelsConfig(_Frozen):
+    horizon_days: int
+    selection_metric: Literal["c_within_landmark", "c_pooled"]
+    bootstrap_reps: int
+    families: dict[str, ModelFamily]
+    mlflow: MLflowConfig
+
+
 def _read_yaml(path: Path) -> object:
     with path.open() as fh:
         return yaml.safe_load(fh)
@@ -149,3 +167,8 @@ def load_labels_config(path: Path = CONFIG_DIR / "labels.yaml") -> LabelsConfig:
 @cache
 def load_landmarks_config(path: Path = CONFIG_DIR / "landmarks.yaml") -> LandmarksConfig:
     return LandmarksConfig.model_validate(_read_yaml(path))
+
+
+@cache
+def load_models_config(path: Path = CONFIG_DIR / "models.yaml") -> ModelsConfig:
+    return ModelsConfig.model_validate(_read_yaml(path))
