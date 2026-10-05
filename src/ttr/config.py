@@ -149,6 +149,31 @@ class ModelsConfig(_Frozen):
     mlflow: MLflowConfig
 
 
+class Thresholds(_Frozen):
+    min: float
+    max: float
+    n: int
+
+
+class DecisionConfig(_Frozen):
+    horizon_days: int
+    population_case_rate: float
+    population_case_rate_grid: tuple[float, ...]
+    capacity_shares: tuple[float, ...]
+    headline_capacity_share: float
+    dca_thresholds: Thresholds
+    age_bands: tuple[int, ...]
+    top_countries: int
+    models: tuple[str, ...]
+
+    @model_validator(mode="after")
+    def _rates(self) -> DecisionConfig:
+        for r in (self.population_case_rate, *self.population_case_rate_grid):
+            if not 0 < r < 1:
+                raise ValueError("population case rates must be in (0, 1)")
+        return self
+
+
 def _read_yaml(path: Path) -> object:
     with path.open() as fh:
         return yaml.safe_load(fh)
@@ -172,3 +197,8 @@ def load_landmarks_config(path: Path = CONFIG_DIR / "landmarks.yaml") -> Landmar
 @cache
 def load_models_config(path: Path = CONFIG_DIR / "models.yaml") -> ModelsConfig:
     return ModelsConfig.model_validate(_read_yaml(path))
+
+
+@cache
+def load_decision_config(path: Path = CONFIG_DIR / "decision.yaml") -> DecisionConfig:
+    return DecisionConfig.model_validate(_read_yaml(path))

@@ -1,0 +1,21 @@
+# Decision layer: who should the RG team contact this month?
+horizon_days: 30
+
+# Case-control correction (ADR 0005). The share of active players who become harm-onset RG
+# cases during the 13-month event window is unknown; results are shown across this grid and
+# headline numbers use `population_case_rate`.
+population_case_rate: 0.005
+population_case_rate_grid: [0.0025, 0.005, 0.01, 0.02]
+
+# Monthly contact budgets, as a share of scored (active) players.
+capacity_shares: [0.005, 0.01, 0.02, 0.05, 0.10]
+headline_capacity_share: 0.01
+
+# Decision-curve thresholds (30-day risk at which a contact is worth it).
+dca_thresholds: {min: 0.0002, max: 0.05, n: 60}
+
+# Subgroup evaluation (demographics are not model features, ADR 0004).
+age_bands: [18, 25, 35, 50, 120]
+top_countries: 4
+
+models: [rule_baseline, cox, xgb_cox, xgb_aft]
