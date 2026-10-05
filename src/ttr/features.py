@@ -17,7 +17,7 @@ import duckdb
 import numpy as np
 import pandas as pd
 
-from ttr.config import PROJECT_ROOT
+from ttr.config import PROJECT_ROOT, DataConfig
 
 log = logging.getLogger(__name__)
 
@@ -187,3 +187,23 @@ def feature_docs_markdown() -> str:
 def write_feature_docs(path: Path) -> Path:
     path.write_text(feature_docs_markdown())
     return path
+
+
+def features_from_activity(
+    activity: pd.DataFrame, players: pd.DataFrame, landmark: pd.Timestamp, data_cfg: DataConfig
+) -> pd.DataFrame:
+    """Features at one landmark straight from raw daily activity (as used by the scoring API).
+
+    ``activity`` has the raw daily-aggregate columns (user_id, date, product_type, turnover,
+    hold, n_bets); ``players`` has user_id and first_deposit_date. Runs the same cleaning and SQL
+    as the offline pipeline, so online and batch features cannot drift apart.
+    """
+    from ttr.data.clean import clean_daily
+
+    daily = clean_daily(activity, data_cfg)
+    before = daily[daily["is_bet_day"] & (daily["date"] < landmark)]
+    last_bet = before.groupby("user_id")["date"].max()
+    rows = players[["user_id", "first_deposit_date"]].assign(landmark=landmark)
+    rows["days_since_last_bet"] = (landmark - rows["user_id"].map(last_bet)).dt.days
+    rows["tenure_days"] = (landmark - rows["first_deposit_date"]).dt.days
+    return compute_features(daily, rows.drop(columns="first_deposit_date"))

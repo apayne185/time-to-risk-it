@@ -5,13 +5,13 @@ SYN_PROCESSED := data/processed/synthetic
 
 export MLFLOW_DISABLE_AGENT_HINT := 1
 
-.PHONY: help install lint typecheck test check demo ingest clean-data eda landmarks features train evaluate mlflow-ui
+.PHONY: help install lint typecheck test check demo ingest clean-data eda landmarks features train evaluate monitor serve docker-build docker-demo mlflow-ui
 
 help:  ## Show available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
 
-install:  ## Install dependencies and git hooks
-	uv sync
+install:  ## Install dependencies (incl. training extras) and git hooks
+	uv sync --all-extras
 	uv run pre-commit install
 
 lint:  ## Lint and check formatting
@@ -36,6 +36,8 @@ demo:  ## Run the pipeline on synthetic data (no data licence needed)
 		--model-dir data/models/synthetic --report data/reports/synthetic/models.md
 	uv run ttr evaluate --processed-dir $(SYN_PROCESSED) --model-dir data/models/synthetic \
 		--out-dir data/reports/synthetic
+	uv run ttr monitor --processed-dir $(SYN_PROCESSED) --bundle data/models/synthetic/decision_model.joblib \
+		--report data/reports/synthetic/monitoring.md
 
 ingest:  ## Ingest the real dataset from data/raw/bwin_rg
 	uv run ttr ingest
@@ -60,6 +62,18 @@ train: features  ## Select, refit and evaluate all model families (logs to MLflo
 
 evaluate: train  ## Decision layer: calibration, net benefit, capacity, subgroups
 	uv run ttr evaluate --label primary
+
+monitor:  ## Feature/score drift and the recommended monthly intercept shift
+	uv run ttr monitor
+
+serve:  ## Run the scoring API locally on :8000
+	uv run ttr serve
+
+docker-build:  ## Build the scoring-service image
+	docker build -t time-to-risk-it:latest .
+
+docker-demo: demo docker-build  ## Serve the synthetic-data model in Docker on :8000
+	MODELS_DIR=./data/models MODEL_NAME=synthetic docker compose up api
 
 mlflow-ui:  ## Browse experiment runs
 	uv run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db

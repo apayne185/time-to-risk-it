@@ -248,3 +248,124 @@ def evaluate(
         f"top {dcfg.headline_capacity_share:.1%} reaches {cap:.0%} of next-month cases"
     )
     typer.echo(f"bundle: {bundle}\nreport: {report}")
+
+
+@app.command()
+def serve(
+    bundle: Annotated[Path | None, typer.Option(help="Decision bundle (.joblib).")] = None,
+    host: Annotated[str, typer.Option()] = "127.0.0.1",
+    port: Annotated[int, typer.Option()] = 8000,
+) -> None:
+    """Run the HTTP scoring service."""
+    import os
+
+    import uvicorn
+
+    if bundle is not None:
+        os.environ["TTR_MODEL_BUNDLE"] = str(bundle.resolve())
+    uvicorn.run("ttr.serve.app:app", host=host, port=port)
+
+
+def _default_bundle(label: str | None) -> Path:
+    from ttr.config import PROJECT_ROOT, load_labels_config
+
+    return (
+        PROJECT_ROOT
+        / "models"
+        / (label or load_labels_config().default)
+        / ("decision_model.joblib")
+    )
+
+
+@app.command()
+def score(
+    input: Annotated[Path, typer.Option(help="Feature table (parquet) to score.")],
+    output: Annotated[Path, typer.Option(help="Where to write scores (parquet).")],
+    bundle: Annotated[Path | None, typer.Option(help="Decision bundle (.joblib).")] = None,
+    landmark: Annotated[
+        str | None, typer.Option(help="Only score rows at this landmark (YYYY-MM-DD).")
+    ] = None,
+) -> None:
+    """Batch-score a feature table with the same scorer as the HTTP service."""
+    import json
+
+    import pandas as pd
+
+    from ttr.serve.scoring import Scorer
+
+    scorer = Scorer.load(bundle or _default_bundle(None))
+    table = pd.read_parquet(input)
+    if landmark is not None:
+        table = table[table["landmark"] == pd.Timestamp(landmark)]
+    scores = scorer.score(table.reset_index(drop=True))
+    keys = [c for c in ("user_id", "landmark") if c in table.columns]
+    out = pd.concat([table[keys].reset_index(drop=True), scores.reset_index(drop=True)], axis=1)
+    out["top_drivers"] = out["top_drivers"].map(json.dumps)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    out.to_parquet(output, index=False)
+    typer.echo(f"scored {len(out):,} rows, {int(out['flagged'].sum()):,} flagged -> {output}")
+
+
+@app.command()
+def monitor(
+    processed_dir: Annotated[
+        Path | None, typer.Option(help="Defaults to configs/data.yaml.")
+    ] = None,
+    label: Annotated[str | None, typer.Option()] = None,
+    bundle: Annotated[Path | None, typer.Option(help="Decision bundle (.joblib).")] = None,
+    reference_split: Annotated[str, typer.Option()] = "train",
+    current_split: Annotated[str, typer.Option()] = "test",
+    report: Annotated[Path, typer.Option()] = Path("reports/monitoring.md"),
+    write_shift: Annotated[
+        bool, typer.Option(help="Store the recommended intercept shift in the bundle.")
+    ] = False,
+) -> None:
+    """Input and score drift (PSI), plus the monthly intercept update from latest outcomes."""
+    import joblib
+    import pandas as pd
+
+    from ttr.config import load_decision_config, load_labels_config
+    from ttr.evaluate.run import horizon_outcome
+    from ttr.evaluate.weights import case_control_weights
+    from ttr.monitor import monitor as run_monitor
+    from ttr.monitor import monitoring_markdown
+    from ttr.serve.scoring import Scorer
+
+    cfg = load_data_config()
+    dcfg = load_decision_config()
+    name = label or load_labels_config().default
+    path = bundle or _default_bundle(name)
+    scorer = Scorer.load(path)
+    table = pd.read_parquet(
+        cfg.resolve(processed_dir or cfg.processed_dir) / f"features_{name}.parquet"
+    )
+    ref = table[table["split"] == reference_split].reset_index(drop=True)
+    cur = table[table["split"] == current_split].reset_index(drop=True)
+    ref_scores, cur_scores = scorer.score(ref, explain=0), scorer.score(cur, explain=0)
+
+    weights = case_control_weights(table, dcfg.population_case_rate)
+    latest = cur["landmark"].max()
+    mask = (cur["landmark"] == latest).to_numpy()
+    outcomes = pd.DataFrame(
+        {
+            # Undo the active shift so the recommendation is absolute, not incremental.
+            "probability": scorer.bundle["recalibrator"].transform(
+                scorer.bundle["model"].predict_event_prob(
+                    cur.loc[mask, scorer.features], scorer.bundle["horizon_days"]
+                )
+            ),
+            "y": horizon_outcome(cur[mask], scorer.bundle["horizon_days"]),
+            "w": weights[(table["split"] == current_split).to_numpy()][mask],
+        }
+    )
+    result = run_monitor(ref, cur, scorer.features, ref_scores, cur_scores, outcomes)
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(monitoring_markdown(result, reference_split, current_split))
+    typer.echo(
+        f"score PSI {result.score_psi:.3f}; "
+        f"recommended shift {result.recommended_shift:+.3f}; report: {report}"
+    )
+    if write_shift and result.recommended_shift is not None:
+        scorer.bundle["intercept_shift"] = result.recommended_shift
+        joblib.dump(scorer.bundle, path)
+        typer.echo(f"intercept shift written to {path}")
