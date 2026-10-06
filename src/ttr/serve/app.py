@@ -6,6 +6,8 @@ Endpoints:
 - ``GET /ready``: readiness (503 until a model is loaded), for load-balancer health checks.
 - ``GET /model``: model metadata, policy threshold and the active intercept shift.
 - ``POST /score``: score players from precomputed features (the feature pipeline's output).
+  ``?notes=true`` adds a plain-language note for the agent (template by default,
+  ``TTR_NOTES_MODE=claude`` for Claude-written notes with a template fallback).
 - ``POST /score/activity``: compute features from raw daily activity, then score. Uses the same
   cleaning and SQL as the offline pipeline.
 
@@ -32,6 +34,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ttr.config import PROJECT_ROOT, load_data_config
 from ttr.features import features_from_activity
+from ttr.notes.facts import player_facts
+from ttr.notes.schema import NoteResult
+from ttr.notes.writer import NoteWriter, writer_from_env
 from ttr.serve.scoring import Scorer, clean_number, describe, fetch_bundle
 
 log = logging.getLogger(__name__)
@@ -53,6 +58,9 @@ class PlayerScore(BaseModel):
     probability_30d: Annotated[float, Field(ge=0, le=1)]
     flagged: bool = Field(description="Above the monthly contact-capacity threshold")
     top_drivers: list[Driver]
+    agent_note: NoteResult | None = Field(
+        default=None, description="Plain-language note for the RG agent (?notes=true)"
+    )
 
 
 class ScoreResponse(BaseModel):
@@ -91,7 +99,14 @@ class ActivityRequest(BaseModel):
     activity: list[ActivityRow]
 
 
-def _response(scorer: Scorer, ids: list[int], X: pd.DataFrame) -> ScoreResponse:
+def _note(writer: NoteWriter, pid: int, row: pd.Series) -> NoteResult:
+    drivers = [{**d, "description": describe(str(d["feature"]))} for d in row["top_drivers"]]
+    return writer.write(player_facts(pid, float(row["probability"]), bool(row["flagged"]), drivers))
+
+
+def _response(
+    scorer: Scorer, ids: list[int], X: pd.DataFrame, writer: NoteWriter | None = None
+) -> ScoreResponse:
     scored = scorer.score(X)
     scores = [
         PlayerScore(
@@ -108,6 +123,7 @@ def _response(scorer: Scorer, ids: list[int], X: pd.DataFrame) -> ScoreResponse:
                 )
                 for d in row["top_drivers"]
             ],
+            agent_note=None if writer is None else _note(writer, pid, row),
         )
         for pid, (_, row) in zip(ids, scored.iterrows(), strict=True)
     ]
@@ -121,6 +137,7 @@ def create_app(bundle_path: Path | str | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:
             app.state.scorer = Scorer.load(fetch_bundle(location))
+            app.state.note_writer = writer_from_env()
             log.info("loaded model bundle %s", location)
         except Exception:  # missing file, S3 error, bad bundle: stay up, report not ready
             app.state.scorer = None
@@ -155,7 +172,7 @@ def create_app(bundle_path: Path | str | None = None) -> FastAPI:
         return scorer(request).info()
 
     @app.post("/score")
-    def score(request: Request, body: ScoreRequest) -> ScoreResponse:
+    def score(request: Request, body: ScoreRequest, notes: bool = False) -> ScoreResponse:
         s = scorer(request)
         expected = set(s.features)
         for p in body.players:
@@ -175,10 +192,13 @@ def create_app(bundle_path: Path | str | None = None) -> FastAPI:
                 for p in body.players
             ]
         )
-        return _response(s, [p.player_id for p in body.players], X)
+        writer = request.app.state.note_writer if notes else None
+        return _response(s, [p.player_id for p in body.players], X, writer)
 
     @app.post("/score/activity")
-    def score_activity(request: Request, body: ActivityRequest) -> ScoreResponse:
+    def score_activity(
+        request: Request, body: ActivityRequest, notes: bool = False
+    ) -> ScoreResponse:
         s = scorer(request)
         players = pd.DataFrame(
             {
@@ -213,7 +233,8 @@ def create_app(bundle_path: Path | str | None = None) -> FastAPI:
             activity, players, pd.Timestamp(body.landmark), load_data_config()
         )
         feats = feats.set_index("user_id").reindex(players["user_id"])
-        return _response(s, players["user_id"].tolist(), feats.reset_index(drop=True))
+        writer = request.app.state.note_writer if notes else None
+        return _response(s, players["user_id"].tolist(), feats.reset_index(drop=True), writer)
 
     return app
 
