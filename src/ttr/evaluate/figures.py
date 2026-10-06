@@ -20,6 +20,7 @@ NAMES = {
     "cox": "Cox",
     "xgb_cox": "XGBoost Cox",
     "xgb_aft": "XGBoost AFT",
+    "torch_hazard": "PyTorch hazard net",
 }
 
 

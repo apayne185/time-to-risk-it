@@ -197,8 +197,8 @@ share of next-month RG cases who were among the contacted players, at each month
 
 {_model_table(result, cfg)}
 
-The decision model is the learned model with the best OOF AUC. The learned models are close;
-all clearly beat the rule baseline.
+The decision model is the servable learned model (Cox or XGBoost; the serving image excludes
+PyTorch) with the best OOF AUC. The PyTorch hazard net is evaluated for comparison only.
 
 ## Net benefit
 

@@ -24,7 +24,7 @@ from ttr.labels import get_definition
 from ttr.landmarks import build_landmarks
 from ttr.train import train_all
 
-FAMILIES = ("rule_baseline", "cox", "xgb_cox")
+FAMILIES = ("rule_baseline", "cox", "xgb_cox", "torch_hazard")
 
 
 @pytest.fixture(scope="module")
@@ -65,7 +65,9 @@ def test_evaluation_end_to_end(trained: tuple[pd.DataFrame, pd.DataFrame, Path])
     dcfg = load_decision_config().model_copy(update={"models": FAMILIES})
     result = run_evaluation(table, players, root / "models" / "primary", dcfg)
 
+    # torch_hazard is evaluated but never chosen: the serving image cannot load it
     assert result.decision_family in ("cox", "xgb_cox")
+    assert "torch_hazard" in result.evaluations
     assert set(result.evaluations) == set(FAMILIES)
     for ev in result.evaluations.values():
         assert 0.5 < ev.test_auc <= 1

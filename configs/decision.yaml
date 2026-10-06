@@ -18,4 +18,8 @@ dca_thresholds: {min: 0.0002, max: 0.05, n: 60}
 age_bands: [18, 25, 35, 50, 120]
 top_countries: 4
 
-models: [rule_baseline, cox, xgb_cox, xgb_aft]
+models: [rule_baseline, cox, xgb_cox, xgb_aft, torch_hazard]
+
+# The decision model is chosen only among families the lean serving image can load (no PyTorch
+# there: ~700 MB). Set before any torch_hazard results were seen; the others are compared only.
+serving_families: [cox, xgb_cox, xgb_aft]

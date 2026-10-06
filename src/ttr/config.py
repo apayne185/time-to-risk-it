@@ -167,6 +167,7 @@ class DecisionConfig(_Frozen):
     age_bands: tuple[int, ...]
     top_countries: int
     models: tuple[str, ...]
+    serving_families: tuple[str, ...] = ("cox", "xgb_cox", "xgb_aft")
 
     @model_validator(mode="after")
     def _rates(self) -> DecisionConfig:
