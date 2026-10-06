@@ -48,6 +48,9 @@ jobs:
             --family xgb_cox --model-dir data/models/synthetic --report data/reports/synthetic/models.md
           uv run ttr evaluate --processed-dir data/processed/synthetic --model-dir data/models/synthetic \
             --out-dir data/reports/synthetic
+          uv run ttr notes eval --features data/processed/synthetic/features_primary.parquet \
+            --bundle data/models/synthetic/decision_model.joblib --n 10 \
+            --notes-out data/reports/synthetic/notes.jsonl --report data/reports/synthetic/notes_eval.md
           uv run ttr monitor --processed-dir data/processed/synthetic \
             --bundle data/models/synthetic/decision_model.joblib --report data/reports/synthetic/monitoring.md
       - name: Smoke-test the scoring service

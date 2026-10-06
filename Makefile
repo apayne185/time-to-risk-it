@@ -5,7 +5,7 @@ SYN_PROCESSED := data/processed/synthetic
 
 export MLFLOW_DISABLE_AGENT_HINT := 1
 
-.PHONY: help install lint typecheck test check demo ingest clean-data eda landmarks features train evaluate monitor serve docker-build docker-demo stream-demo aws-lint mlflow-ui
+.PHONY: help install lint typecheck test check demo ingest clean-data eda landmarks features train evaluate monitor serve docker-build docker-demo stream-demo aws-lint notes-eval mlflow-ui
 
 help:  ## Show available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -85,6 +85,9 @@ stream-demo: demo  ## Replay synthetic activity through Redpanda and score it on
 
 aws-lint:  ## Validate the CloudFormation templates offline
 	uv run cfn-lint infra/aws/*.yaml
+
+notes-eval:  ## Agent notes on the top-25 players (WRITER=claude calls the API and costs money)
+	uv run ttr notes eval --writer $(or $(WRITER),template)
 
 mlflow-ui:  ## Browse experiment runs
 	uv run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db
