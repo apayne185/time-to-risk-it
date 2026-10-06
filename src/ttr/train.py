@@ -49,6 +49,10 @@ def build_model(
     if family == "xgb_aft":
         sigma = float(params.pop("sigma", 1.0))
         return XGBAFT(params=params, sigma=sigma, **boost)
+    if family == "torch_hazard":
+        from ttr.models.torch_hazard import DiscreteTimeHazardNet  # optional torch extra
+
+        return DiscreteTimeHazardNet(**params, num_boost_round=num_boost_round)
     raise ValueError(f"unknown model family {family!r}")
 
 
