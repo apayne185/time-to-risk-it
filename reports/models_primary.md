@@ -11,6 +11,7 @@ bootstrap (percentile, 95%).
 | cox | 0.775 | 0.759 [0.736, 0.780] | 0.759 | penalizer=0.01, l1_ratio=0.0 |
 | xgb_cox | 0.773 | 0.768 [0.746, 0.789] | 0.768 | max_depth=2, min_child_weight=50 |
 | xgb_aft | 0.775 | 0.771 [0.748, 0.791] | 0.772 | max_depth=2, min_child_weight=50, sigma=1.2 |
+| torch_hazard | 0.763 | 0.750 [0.727, 0.775] | 0.750 | hidden=32, dropout=0.3 |
 
 Within-landmark C compares players scored on the same date, which is what an RG team does. Pooled
 C also rewards ranking late landmarks above early ones, which in this case-control sample reflects
