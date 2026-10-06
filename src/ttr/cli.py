@@ -446,3 +446,48 @@ def stream_read(
     typer.echo(f"{len(messages):,} messages on {topic}")
     if len(messages) < min_count:
         raise typer.Exit(1)
+
+
+notes_app = typer.Typer(help="Plain-language notes for RG agents.", no_args_is_help=True)
+app.add_typer(notes_app, name="notes")
+
+
+@notes_app.command("eval")
+def notes_eval(
+    features: Annotated[Path, typer.Option(help="Feature table (parquet).")] = Path(
+        "data/processed/features_primary.parquet"
+    ),
+    bundle: Annotated[Path | None, typer.Option(help="Decision bundle (.joblib).")] = None,
+    writer: Annotated[
+        str, typer.Option(help="template or claude (calls the API: costs money).")
+    ] = ("template"),
+    n: Annotated[int, typer.Option(help="Number of highest-risk players.")] = 25,
+    model: Annotated[str, typer.Option(help="Claude model for --writer claude.")] = (
+        "claude-opus-5-5"
+    ),
+    notes_out: Annotated[Path, typer.Option(help="Per-player notes (JSONL, keep out of git).")] = (
+        Path("data/reports/notes.jsonl")
+    ),
+    report: Annotated[Path, typer.Option()] = Path("reports/notes_eval.md"),
+) -> None:
+    """Write notes for the highest-risk players and report guard pass rate and cost."""
+    import pandas as pd
+
+    from ttr.notes.evaluate import evaluate_notes, evaluation_markdown
+    from ttr.notes.writer import ClaudeNoteWriter, NoteWriter, TemplateNoteWriter
+    from ttr.serve.scoring import Scorer
+
+    note_writer: NoteWriter = (
+        ClaudeNoteWriter(model=model) if writer == "claude" else TemplateNoteWriter()
+    )
+    ev = evaluate_notes(
+        pd.read_parquet(features),
+        Scorer.load(bundle or _default_bundle(None)),
+        note_writer,
+        n,
+        out=notes_out,
+    )
+    report.parent.mkdir(parents=True, exist_ok=True)
+    name = f"Claude ({model})" if writer == "claude" else "template"
+    report.write_text(evaluation_markdown(ev, name))
+    typer.echo(f"{len(ev.results)} notes: {dict(ev.sources)}; report: {report}")

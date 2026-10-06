@@ -93,7 +93,7 @@ Requires [uv](https://docs.astral.sh/uv/). No data licence needed for the demo.
 ```bash
 make install    # dependencies + git hooks
 make demo       # full pipeline on synthetic data: ingest → … → evaluate → monitor
-make test       # 102 tests; real-data tests skip without the licensed files
+make test       # 127 tests; real-data tests skip without the licensed files
 ```
 
 Serve the demo model and score a player:
@@ -123,6 +123,9 @@ make evaluate   # ingest, clean, landmarks, features, train (MLflow), decision l
 make mlflow-ui  # browse runs
 ```
 
+Add `?notes=true` to either scoring endpoint for a plain-language note per player (template by
+default; `TTR_NOTES_MODE=claude` with `uv sync --extra llm` for Claude-written, guard-checked notes).
+
 An example response from `POST /score/activity` (raw daily activity in, explained score out):
 
 ```json
@@ -140,7 +143,7 @@ An example response from `POST /score/activity` (raw daily activity in, explaine
 ## Engineering
 
 - **Python 3.12, uv, ruff, mypy `--strict`**, pre-commit hooks running the locked tool versions.
-- **102 tests**: unit, Hypothesis property tests (outcome invariants, feature leakage), end-to-end
+- **127 tests**: unit, Hypothesis property tests (outcome invariants, feature leakage), end-to-end
   pipeline runs on synthetic data, API/batch parity, online/offline feature parity, and real-data
   regression tests that pin reproduction of the published paper.
 - **Data contracts** with pandera; SHA-256 checks on the raw files; a hook blocks licensed data
@@ -150,6 +153,10 @@ An example response from `POST /score/activity` (raw daily activity in, explaine
 - **MLflow** tracking (git SHA and feature-table hash on every run), deterministic retraining.
 - **FastAPI** service with typed request/response schemas, a lean Docker image (training extras
   excluded), and **PSI drift monitoring** with a monthly recalibration job.
+- **LLM notes for agents**: Claude turns a score's drivers into a short note and a supportive
+  opener, through structured output and a guard that rejects invented numbers, diagnostic or
+  promotional language and model jargon; failures fall back to a deterministic template
+  ([ADR 0009](docs/decisions/0009-agent-notes.md)).
 - **AWS**: CloudFormation for ECS Fargate + ALB, a private versioned model bucket, readiness-gated
   rolling deploys with automatic rollback, autoscaling and alarms, deployed through GitHub OIDC
   with no stored keys ([ADR 0008](docs/decisions/0008-aws-deployment.md)).
@@ -174,6 +181,7 @@ src/ttr/
   explain.py   TreeSHAP / linear contributions, top drivers
   serve/       scoring core and FastAPI app
   stream/      event schemas, event-time StreamScorer, Kafka adapters
+  notes/       agent notes: facts, guard, template and Claude writers, evaluation
   monitor.py   PSI drift, monthly intercept shift
 configs/       data, labels, landmarks, models, decision policy
 infra/aws/     CloudFormation: foundation, GitHub OIDC deploy access, scoring service

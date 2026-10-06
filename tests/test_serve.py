@@ -158,3 +158,16 @@ def test_missing_bundle_returns_503(tmp_path: Path) -> None:
     with TestClient(create_app(tmp_path / "nope.joblib")) as c:
         assert c.get("/health").json()["model_loaded"] is False
         assert c.get("/model").status_code == 503
+
+
+def test_score_with_agent_notes(client: TestClient, world: dict[str, object]) -> None:
+    table: pd.DataFrame = world["table"]  # type: ignore[assignment]
+    row = table.iloc[0]
+    body = {"players": [{"player_id": int(row.user_id), "features": _feature_payload(row)}]}
+    plain = client.post("/score", json=body).json()["scores"][0]
+    assert plain["agent_note"] is None
+    noted = client.post("/score?notes=true", json=body).json()["scores"][0]
+    note = noted["agent_note"]
+    assert note["source"] == "template" and note["violations"] == []
+    cited = {o["feature"] for o in note["note"]["observations"]}
+    assert cited <= {d["feature"] for d in noted["top_drivers"]}
