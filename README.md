@@ -93,7 +93,7 @@ Requires [uv](https://docs.astral.sh/uv/). No data licence needed for the demo.
 ```bash
 make install    # dependencies + git hooks
 make demo       # full pipeline on synthetic data: ingest → … → evaluate → monitor
-make test       # 102 tests; real-data tests skip without the licensed files
+make test       # 127 tests; real-data tests skip without the licensed files
 ```
 
 Serve the demo model and score a player:
@@ -143,7 +143,7 @@ An example response from `POST /score/activity` (raw daily activity in, explaine
 ## Engineering
 
 - **Python 3.12, uv, ruff, mypy `--strict`**, pre-commit hooks running the locked tool versions.
-- **102 tests**: unit, Hypothesis property tests (outcome invariants, feature leakage), end-to-end
+- **127 tests**: unit, Hypothesis property tests (outcome invariants, feature leakage), end-to-end
   pipeline runs on synthetic data, API/batch parity, online/offline feature parity, and real-data
   regression tests that pin reproduction of the published paper.
 - **Data contracts** with pandera; SHA-256 checks on the raw files; a hook blocks licensed data
