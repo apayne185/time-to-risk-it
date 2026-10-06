@@ -3,14 +3,17 @@
 Endpoints:
 
 - ``GET /health``: liveness, and whether a model is loaded.
+- ``GET /ready``: readiness (503 until a model is loaded), for load-balancer health checks.
 - ``GET /model``: model metadata, policy threshold and the active intercept shift.
 - ``POST /score``: score players from precomputed features (the feature pipeline's output).
 - ``POST /score/activity``: compute features from raw daily activity, then score. Uses the same
   cleaning and SQL as the offline pipeline.
 
-The model bundle path comes from ``TTR_MODEL_BUNDLE`` (default
-``models/primary/decision_model.joblib``). Scores support a human review and a supportive
-contact; they are not for restricting, targeting or marketing to players.
+The model bundle comes from ``TTR_MODEL_BUNDLE``: a local path (default
+``models/primary/decision_model.joblib``) or an ``s3://bucket/key`` URI (AWS deployment).
+
+Scores support a human review and a supportive contact; they are not for restricting, targeting
+or marketing to players.
 """
 
 from __future__ import annotations
@@ -29,7 +32,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ttr.config import PROJECT_ROOT, load_data_config
 from ttr.features import features_from_activity
-from ttr.serve.scoring import Scorer, clean_number, describe
+from ttr.serve.scoring import Scorer, clean_number, describe, fetch_bundle
 
 log = logging.getLogger(__name__)
 
@@ -111,17 +114,17 @@ def _response(scorer: Scorer, ids: list[int], X: pd.DataFrame) -> ScoreResponse:
     return ScoreResponse(model=scorer.info(), scores=scores)
 
 
-def create_app(bundle_path: Path | None = None) -> FastAPI:
-    path = bundle_path or Path(os.environ.get("TTR_MODEL_BUNDLE", DEFAULT_BUNDLE))
+def create_app(bundle_path: Path | str | None = None) -> FastAPI:
+    location = bundle_path or os.environ.get("TTR_MODEL_BUNDLE", str(DEFAULT_BUNDLE))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:
-            app.state.scorer = Scorer.load(path)
-            log.info("loaded model bundle %s", path)
-        except FileNotFoundError:
+            app.state.scorer = Scorer.load(fetch_bundle(location))
+            log.info("loaded model bundle %s", location)
+        except Exception:  # missing file, S3 error, bad bundle: stay up, report not ready
             app.state.scorer = None
-            log.error("no model bundle at %s; scoring endpoints return 503", path)
+            log.exception("could not load model bundle %s; scoring endpoints return 503", location)
         yield
 
     app = FastAPI(
@@ -140,6 +143,12 @@ def create_app(bundle_path: Path | None = None) -> FastAPI:
     @app.get("/health")
     def health(request: Request) -> dict[str, Any]:
         return {"status": "ok", "model_loaded": request.app.state.scorer is not None}
+
+    @app.get("/ready")
+    def ready(request: Request) -> dict[str, str]:
+        """Readiness for load balancers: 503 until a model is loaded."""
+        scorer(request)
+        return {"status": "ready"}
 
     @app.get("/model")
     def model_info(request: Request) -> dict[str, Any]:

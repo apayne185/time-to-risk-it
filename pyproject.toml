@@ -32,14 +32,20 @@ train = [
 stream = [
     "confluent-kafka>=2.15.1",
 ]
+# Load the model bundle from S3 in AWS deployments.
+aws = [
+    "boto3>=1.43.108",
+]
 
 [project.scripts]
 ttr = "ttr.cli:app"
 
 [dependency-groups]
 dev = [
+    "cfn-lint>=1.57.1",
     "httpx2>=2.13.1",
     "hypothesis>=6.100",
+    "moto[s3]>=5.2.3",
     "mypy>=1.11",
     "pandas-stubs>=2.2",
     "pre-commit>=3.8",
@@ -75,7 +81,7 @@ mypy_path = "src"
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["pandera.*", "duckdb.*", "sklearn.*", "lifelines.*", "scipy.*", "joblib.*", "confluent_kafka.*"]
+module = ["pandera.*", "duckdb.*", "sklearn.*", "lifelines.*", "scipy.*", "joblib.*", "confluent_kafka.*", "boto3.*", "botocore.*", "moto.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  time-to-risk-it foundation: container registry and model-bundle bucket. Deploy once per
+  account/region before the scoring-service stack.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: ttr
+    AllowedPattern: "^[a-z][a-z0-9-]{1,20}$"
+    Description: Short lowercase name used to prefix resources.
+
+Resources:
+  Repository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${ProjectName}/scoring-service"
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules": [{"rulePriority": 1, "description": "Keep the 20 most recent images",
+            "selection": {"tagStatus": "any", "countType": "imageCountMoreThan",
+                          "countNumber": 20},
+            "action": {"type": "expire"}}]}
+
+  # Model bundles are trained on licensed data: private, encrypted, versioned (rollback = point
+  # the service at an earlier version or key).
+  ModelBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "${ProjectName}-models-${AWS::AccountId}-${AWS::Region}"
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-bundle-versions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 180
+
+  ModelBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ModelBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt ModelBucket.Arn
+              - !Sub "${ModelBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+Outputs:
+  RepositoryUri:
+    Value: !GetAtt Repository.RepositoryUri
+    Export:
+      Name: !Sub "${ProjectName}-repository-uri"
+  RepositoryArn:
+    Value: !GetAtt Repository.Arn
+    Export:
+      Name: !Sub "${ProjectName}-repository-arn"
+  ModelBucketName:
+    Value: !Ref ModelBucket
+    Export:
+      Name: !Sub "${ProjectName}-model-bucket"
+  ModelBucketArn:
+    Value: !GetAtt ModelBucket.Arn
+    Export:
+      Name: !Sub "${ProjectName}-model-bucket-arn"

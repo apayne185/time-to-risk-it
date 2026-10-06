@@ -1,0 +1,80 @@
+name: deploy-aws
+
+# Manual only: builds the scoring image, pushes it to ECR and updates the scoring-service stack.
+# Prerequisites (docs/deploy-aws.md): foundation and github-deploy stacks, a model bundle in S3,
+# and a "production" GitHub environment with the secrets/variables used below.
+on:
+  workflow_dispatch:
+    inputs:
+      model_bundle_key:
+        description: S3 key of the decision bundle in the model bucket
+        default: bundles/primary/decision_model.joblib
+        required: true
+
+permissions:
+  id-token: write   # OIDC token for AWS
+  contents: read
+
+concurrency:
+  group: deploy-aws
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      PROJECT: ${{ vars.PROJECT_NAME || 'ttr' }}
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        run: |
+          IMAGE="${{ steps.ecr.outputs.registry }}/${PROJECT}/scoring-service:${IMAGE_TAG}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Validate template
+        run: aws cloudformation validate-template --template-body file://infra/aws/scoring-service.yaml
+
+      - name: Deploy scoring-service stack
+        run: |
+          aws cloudformation deploy \
+            --stack-name "${PROJECT}-scoring-service" \
+            --template-file infra/aws/scoring-service.yaml \
+            --role-arn "${{ secrets.AWS_CFN_EXECUTION_ROLE_ARN }}" \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              ProjectName="${PROJECT}" \
+              ImageTag="${IMAGE_TAG}" \
+              ModelBundleKey="${{ inputs.model_bundle_key }}" \
+              VpcId="${{ vars.VPC_ID }}" \
+              LoadBalancerSubnetIds="${{ vars.LB_SUBNET_IDS }}" \
+              ServiceSubnetIds="${{ vars.SERVICE_SUBNET_IDS }}" \
+              AssignPublicIp="${{ vars.ASSIGN_PUBLIC_IP || 'DISABLED' }}" \
+              CertificateArn="${{ vars.CERTIFICATE_ARN }}" \
+              AllowedIngressCidr="${{ vars.ALLOWED_INGRESS_CIDR || '0.0.0.0/0' }}"
+
+      - name: Wait for the service to stabilise
+        run: |
+          aws ecs wait services-stable --cluster "${PROJECT}-cluster" \
+            --services "${PROJECT}-scoring-service"
+
+      - name: Smoke test
+        run: |
+          URL=$(aws cloudformation describe-stacks --stack-name "${PROJECT}-scoring-service" \
+            --query "Stacks[0].Outputs[?OutputKey=='ServiceUrl'].OutputValue" --output text)
+          curl -sfk "$URL/ready"
+          curl -sfk "$URL/model"
+          echo "Deployed: $URL" >> "$GITHUB_STEP_SUMMARY"

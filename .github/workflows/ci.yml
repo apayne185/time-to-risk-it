@@ -32,6 +32,8 @@ jobs:
         run: uv run ruff check . && uv run ruff format --check .
       - name: Type-check
         run: uv run mypy src tests
+      - name: Lint CloudFormation templates
+        run: uv run cfn-lint infra/aws/*.yaml
       - name: Test (synthetic data; real-data tests skip without the licensed files)
         run: uv run pytest --cov=ttr --cov-report=term-missing
       - name: End-to-end smoke on synthetic data
