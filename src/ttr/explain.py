@@ -3,6 +3,7 @@
 - XGBoost: exact TreeSHAP values from XGBoost itself (``pred_contribs``).
 - Cox: linear contributions, coefficient x (standardised value - training mean). Missingness
   indicators are folded back into their feature.
+- Models with their own ``contributions`` method (the PyTorch hazard net: gradient x input).
 """
 
 from __future__ import annotations
@@ -31,6 +32,10 @@ def contributions(model: SurvivalModel, X: pd.DataFrame) -> pd.DataFrame:
         base = [c.removesuffix("__missing") for c in contrib.columns]
         out: pd.DataFrame = contrib.T.groupby(base).sum().T.reindex(columns=list(X.columns))
         return out.set_axis(X.index)
+    own = getattr(model, "contributions", None)  # e.g. the PyTorch hazard net (optional extra)
+    if callable(own):
+        result: pd.DataFrame = own(X)
+        return result
     raise TypeError(f"no contribution method for {type(model).__name__}")
 
 

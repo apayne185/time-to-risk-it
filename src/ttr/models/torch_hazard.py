@@ -177,6 +177,19 @@ class DiscreteTimeHazardNet(SurvivalModel):
         )
         return out
 
+    def contributions(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Gradient x input of the risk score w.r.t. the standardised inputs (0 = training mean),
+        with missingness indicators folded into their feature. A first-order attribution: unlike
+        TreeSHAP it does not sum exactly to the score."""
+        Z = self._inputs(X).requires_grad_(True)
+        h = torch.sigmoid(self.net_(Z)).clamp(max=1 - 1e-7)
+        risk = -torch.log1p(-h).sum(dim=1)
+        (grad,) = torch.autograd.grad(risk.sum(), Z)
+        contrib = pd.DataFrame((grad * Z).detach().numpy(), columns=self.columns_, index=X.index)
+        base = [c.removesuffix("__missing") for c in contrib.columns]
+        out: pd.DataFrame = contrib.T.groupby(base).sum().T.reindex(columns=list(X.columns))
+        return out
+
     def params(self) -> dict[str, Any]:
         return {
             "hidden": self.hidden,

@@ -92,3 +92,15 @@ def test_deterministic_for_seed() -> None:
     a = DiscreteTimeHazardNet(hidden=16, max_epochs=5).fit(data).predict_risk(data.X)
     b = DiscreteTimeHazardNet(hidden=16, max_epochs=5).fit(data).predict_risk(data.X)
     np.testing.assert_allclose(a, b)
+
+
+def test_contributions_point_at_the_planted_features(
+    fitted: tuple[DiscreteTimeHazardNet, SurvivalData],
+) -> None:
+    from ttr.explain import contributions, global_importance
+
+    model, data = fitted
+    contrib = contributions(model, data.X)
+    assert list(contrib.columns) == ["a", "b", "noise"]
+    importance = global_importance(contrib)
+    assert importance.index[0] == "a" and importance["noise"] < importance["b"]
