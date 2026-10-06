@@ -40,6 +40,10 @@ aws = [
 llm = [
     "anthropic>=1.11.0",
 ]
+# Discrete-time neural hazard model (a comparison model; not needed for serving).
+torch = [
+    "torch>=2.14.1",
+]
 
 [project.scripts]
 ttr = "ttr.cli:app"
@@ -96,3 +100,13 @@ filterwarnings = [
     # Raised inside pandas' own Timestamp/Timedelta arithmetic under NumPy 2.4; not actionable here.
     "ignore:The 'generic' unit for NumPy timedelta is deprecated:DeprecationWarning",
 ]
+
+# CPU-only PyTorch wheels: the hazard network is small, and the default Linux wheel pulls in
+# several GB of CUDA libraries.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
