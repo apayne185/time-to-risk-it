@@ -21,6 +21,13 @@ jobs:
           enable-cache: true
       - name: Install
         run: uv sync --frozen --all-extras
+      - name: Start Redpanda (for the streaming test)
+        run: |
+          docker run -d --name redpanda -p 19092:19092 \
+            docker.redpanda.com/redpandadata/redpanda:v26.2.3 redpanda start \
+            --mode=dev-container --smp=1 \
+            --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092 \
+            --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
       - name: Lint
         run: uv run ruff check . && uv run ruff format --check .
       - name: Type-check
@@ -50,6 +57,13 @@ jobs:
           trap 'kill $SERVER' EXIT
           for i in $(seq 1 30); do curl -sf localhost:8000/health && break; sleep 1; done
           curl -sf localhost:8000/model
+      - name: Streaming end-to-end through Redpanda
+        run: |
+          timeout 60 bash -c 'until docker exec redpanda rpk cluster health --exit-when-healthy; do sleep 2; done'
+          uv run ttr stream replay --source data/interim/synthetic/daily.parquet
+          uv run ttr stream score --players data/processed/synthetic/players.parquet \
+            --bundle data/models/synthetic/decision_model.joblib --idle-seconds 10
+          uv run ttr stream read --topic rg.scores --min-count 100
 
   docker:
     runs-on: ubuntu-latest

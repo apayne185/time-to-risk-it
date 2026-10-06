@@ -5,7 +5,7 @@ SYN_PROCESSED := data/processed/synthetic
 
 export MLFLOW_DISABLE_AGENT_HINT := 1
 
-.PHONY: help install lint typecheck test check demo ingest clean-data eda landmarks features train evaluate monitor serve docker-build docker-demo mlflow-ui
+.PHONY: help install lint typecheck test check demo ingest clean-data eda landmarks features train evaluate monitor serve docker-build docker-demo stream-demo mlflow-ui
 
 help:  ## Show available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -74,6 +74,13 @@ docker-build:  ## Build the scoring-service image
 
 docker-demo: demo docker-build  ## Serve the synthetic-data model in Docker on :8000
 	MODELS_DIR=./data/models MODEL_NAME=synthetic docker compose up api
+
+stream-demo: demo  ## Replay synthetic activity through Redpanda and score it online
+	docker compose --profile streaming up -d --wait redpanda
+	uv run ttr stream replay --source $(SYN_INTERIM)/daily.parquet
+	uv run ttr stream score --players $(SYN_PROCESSED)/players.parquet \
+		--bundle data/models/synthetic/decision_model.joblib
+	uv run ttr stream read --topic rg.scores
 
 mlflow-ui:  ## Browse experiment runs
 	uv run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db

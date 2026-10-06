@@ -369,3 +369,80 @@ def monitor(
         scorer.bundle["intercept_shift"] = result.recommended_shift
         joblib.dump(scorer.bundle, path)
         typer.echo(f"intercept shift written to {path}")
+
+
+stream_app = typer.Typer(
+    help="Kafka/Redpanda streaming: replay activity, score online.", no_args_is_help=True
+)
+app.add_typer(stream_app, name="stream")
+DEFAULT_BOOTSTRAP = "localhost:19092"
+
+
+@stream_app.command("replay")
+def stream_replay(
+    source: Annotated[Path, typer.Option(help="Interim daily-aggregates parquet.")] = Path(
+        "data/interim/daily.parquet"
+    ),
+    bootstrap: Annotated[str, typer.Option()] = DEFAULT_BOOTSTRAP,
+    rate: Annotated[float | None, typer.Option(help="Events per second (default: max).")] = None,
+) -> None:
+    """Publish historical daily activity to the bets.daily topic in event-time order."""
+    import pandas as pd
+
+    from ttr.stream.events import events_from_frame
+    from ttr.stream.kafka import replay
+
+    sent = replay(events_from_frame(pd.read_parquet(source)), bootstrap, rate=rate)
+    typer.echo(f"published {sent:,} events")
+
+
+@stream_app.command("score")
+def stream_score(
+    players: Annotated[Path, typer.Option(help="Player table (user_id, first_deposit_date).")] = (
+        Path("data/processed/players.parquet")
+    ),
+    bundle: Annotated[Path | None, typer.Option(help="Decision bundle (.joblib).")] = None,
+    bootstrap: Annotated[str, typer.Option()] = DEFAULT_BOOTSTRAP,
+    idle_seconds: Annotated[float, typer.Option(help="Stop after this long without input.")] = 15,
+) -> None:
+    """Consume bets.daily, score eligible players at each landmark, publish to rg.scores."""
+    import pandas as pd
+
+    from ttr.config import load_landmarks_config
+    from ttr.landmarks import landmark_dates
+    from ttr.serve.scoring import Scorer
+    from ttr.stream.kafka import consume_and_score
+    from ttr.stream.processor import StreamScorer
+
+    lm_cfg = load_landmarks_config()
+    processor = StreamScorer(
+        Scorer.load(bundle or _default_bundle(None)),
+        pd.read_parquet(players, columns=["user_id", "first_deposit_date"]),
+        landmark_dates(lm_cfg),
+        load_data_config(),
+        lm_cfg.eligibility_lookback_days,
+    )
+    stats = consume_and_score(processor, bootstrap, idle_seconds=idle_seconds)
+    typer.echo(
+        f"{stats.events:,} events, {stats.landmarks_fired} landmarks, "
+        f"{stats.players_scored:,} scores ({stats.flagged:,} flagged), "
+        f"{stats.late_events} late events"
+    )
+
+
+@stream_app.command("read")
+def stream_read(
+    topic: Annotated[str, typer.Option()] = "rg.scores",
+    bootstrap: Annotated[str, typer.Option()] = DEFAULT_BOOTSTRAP,
+    show: Annotated[int, typer.Option(help="Print the first N messages.")] = 3,
+    min_count: Annotated[int, typer.Option(help="Exit 1 if fewer messages than this.")] = 0,
+) -> None:
+    """Count (and show) the messages on a topic."""
+    from ttr.stream.kafka import read_topic
+
+    messages = read_topic(bootstrap, topic)
+    for m in messages[:show]:
+        typer.echo(m.decode()[:300])
+    typer.echo(f"{len(messages):,} messages on {topic}")
+    if len(messages) < min_count:
+        raise typer.Exit(1)
