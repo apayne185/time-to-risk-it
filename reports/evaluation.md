@@ -32,9 +32,10 @@ share of next-month RG cases who were among the contacted players, at each month
 | Cox | 0.762 | 0.775 | 8% | 13% | 21% | 34% | 52% | 2.61 | 0.83 |
 | XGBoost Cox **(decision model)** | 0.771 | 0.785 | 7% | 11% | 19% | 43% | 62% | 2.59 | 0.82 |
 | XGBoost AFT | 0.771 | 0.792 | 8% | 14% | 22% | 44% | 63% | 2.64 | 0.81 |
+| PyTorch hazard net | 0.757 | 0.761 | 4% | 7% | 15% | 32% | 50% | 3.20 | 0.82 |
 
-The decision model is the learned model with the best OOF AUC. The learned models are close;
-all clearly beat the rule baseline.
+The decision model is the servable learned model (Cox or XGBoost; the serving image excludes
+PyTorch) with the best OOF AUC. The PyTorch hazard net is evaluated for comparison only.
 
 ## Net benefit
 

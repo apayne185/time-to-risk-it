@@ -13,7 +13,7 @@ from ttr.data.synthetic import SyntheticSpec, generate
 from ttr.features import build_feature_table
 from ttr.labels import get_definition
 from ttr.landmarks import build_landmarks
-from ttr.train import grid_points, train_all
+from ttr.train import build_model, grid_points, train_all
 
 
 @pytest.fixture(scope="module")
@@ -72,3 +72,12 @@ def test_train_all_end_to_end(features_path: Path, tmp_path: Path) -> None:
     runs = mlflow.search_runs(experiment_names=[cfg.mlflow.experiment])
     assert {"selection", "final"} <= set(runs["tags.stage"].dropna())
     assert runs["tags.git_sha"].notna().any()
+
+
+def test_build_torch_hazard_with_fixed_epochs() -> None:
+    from ttr.models.torch_hazard import DiscreteTimeHazardNet
+
+    model = build_model("torch_hazard", {"hidden": 16, "dropout": 0.1}, num_boost_round=7)
+    assert isinstance(model, DiscreteTimeHazardNet)
+    assert model.params()["hidden"] == 16
+    assert model.max_epochs == 7 and model.fixed_epochs is True

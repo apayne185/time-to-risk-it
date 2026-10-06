@@ -267,9 +267,9 @@ def run_evaluation(
         evaluations[family] = evaluate_family(
             joblib.load(path), trval, test, w_trval, w_test, cfg, thresholds
         )
-    learned = {k: v for k, v in evaluations.items() if k != "rule_baseline"}
+    learned = {k: v for k, v in evaluations.items() if k in cfg.serving_families}
     if not learned:
-        raise RuntimeError("no learned models to evaluate")
+        raise RuntimeError("no servable learned models to evaluate")
     decision = max(learned, key=lambda k: learned[k].oof_auc)
     ev = evaluations[decision]
 

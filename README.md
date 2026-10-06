@@ -80,6 +80,7 @@ Test split: Aug–Oct 2009, 1,814 player-months, models selected on earlier mont
 | Cox (stratified by month) | 0.759 | 0.775 | 13% | 34% | 52% |
 | **XGBoost Cox** (decision model, chosen on out-of-fold AUC) | 0.768 | 0.785 | 11% | 43% | 62% |
 | XGBoost AFT | 0.771 | 0.792 | 14% | 44% | 63% |
+| PyTorch discrete-time hazard net (comparison only, [ADR 0010](docs/decisions/0010-neural-hazard-model.md)) | 0.750 | 0.761 | 4% | 32% | 50% |
 
 What the score responds to: recency of betting, peak daily stakes, and how many product types a
 player mixes in a day ([drivers](reports/figures/drivers.png)). Full analysis, calibration,
@@ -93,7 +94,7 @@ Requires [uv](https://docs.astral.sh/uv/). No data licence needed for the demo.
 ```bash
 make install    # dependencies + git hooks
 make demo       # full pipeline on synthetic data: ingest → … → evaluate → monitor
-make test       # 127 tests; real-data tests skip without the licensed files
+make test       # 139 tests; real-data tests skip without the licensed files
 ```
 
 Serve the demo model and score a player:
@@ -143,13 +144,17 @@ An example response from `POST /score/activity` (raw daily activity in, explaine
 ## Engineering
 
 - **Python 3.12, uv, ruff, mypy `--strict`**, pre-commit hooks running the locked tool versions.
-- **127 tests**: unit, Hypothesis property tests (outcome invariants, feature leakage), end-to-end
+- **139 tests**: unit, Hypothesis property tests (outcome invariants, feature leakage), end-to-end
   pipeline runs on synthetic data, API/batch parity, online/offline feature parity, and real-data
   regression tests that pin reproduction of the published paper.
 - **Data contracts** with pandera; SHA-256 checks on the raw files; a hook blocks licensed data
   from ever being committed.
 - **SQL feature layer** in DuckDB ([sql/features](sql/features)), including window functions for
   loss chasing.
+- **PyTorch**: a discrete-time neural hazard model trained on the censored likelihood, with early
+  stopping and gradient × input explanations; CPU wheels via a uv index. It trails gradient
+  boosting on this tabular data and is kept as a comparison, chosen out of serving before its
+  results were known ([ADR 0010](docs/decisions/0010-neural-hazard-model.md)).
 - **MLflow** tracking (git SHA and feature-table hash on every run), deterministic retraining.
 - **FastAPI** service with typed request/response schemas, a lean Docker image (training extras
   excluded), and **PSI drift monitoring** with a monthly recalibration job.
@@ -176,7 +181,7 @@ src/ttr/
   analysis/    paper replication, trajectories
   landmarks.py risk sets, censored outcomes, temporal splits
   features.py  feature registry + DuckDB runner (SQL in sql/features/)
-  models/      rule baseline, stratified Cox, XGBoost Cox/AFT
+  models/      rule baseline, stratified Cox, XGBoost Cox/AFT, PyTorch hazard net
   train.py     selection, refit, MLflow tracking
   evaluate/    weights, calibration, net benefit, capacity, subgroups, report
   explain.py   TreeSHAP / linear contributions, top drivers
