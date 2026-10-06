@@ -31,6 +31,11 @@ which are unacceptable in responsible-gambling outreach.
 6. **Measured, not assumed.** `ttr notes eval` reports the guard pass rate, violation types,
    tokens and cost on the highest-risk players; per-player notes stay out of git.
 
+**Status of the evaluation:** the Claude writer is covered by tests with a fake client (a good
+note, an invented number, a diagnostic label, invalid JSON, a refusal, truncation and an API
+error). It has not yet been run against the live API, so there is no measured pass rate or cost;
+run `make notes-eval WRITER=claude` once API access is available.
+
 ## Consequences
 
 - An agent never sees an unguarded LLM note, at the cost of sometimes seeing a plainer one.

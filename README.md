@@ -161,7 +161,8 @@ An example response from `POST /score/activity` (raw daily activity in, explaine
 - **LLM notes for agents**: Claude turns a score's drivers into a short note and a supportive
   opener, through structured output and a guard that rejects invented numbers, diagnostic or
   promotional language and model jargon; failures fall back to a deterministic template
-  ([ADR 0009](docs/decisions/0009-agent-notes.md)).
+  ([ADR 0009](docs/decisions/0009-agent-notes.md)). The Claude path is tested against a fake
+  client; a live evaluation (`make notes-eval WRITER=claude`) has not been run yet.
 - **AWS**: CloudFormation for ECS Fargate + ALB, a private versioned model bucket, readiness-gated
   rolling deploys with automatic rollback, autoscaling and alarms, deployed through GitHub OIDC
   with no stored keys ([ADR 0008](docs/decisions/0008-aws-deployment.md)).
