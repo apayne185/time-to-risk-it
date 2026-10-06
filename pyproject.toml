@@ -36,6 +36,10 @@ stream = [
 aws = [
     "boto3>=1.43.108",
 ]
+# Claude-written notes for RG agents (optional; a deterministic template is the default).
+llm = [
+    "anthropic>=1.11.0",
+]
 
 [project.scripts]
 ttr = "ttr.cli:app"
@@ -81,7 +85,7 @@ mypy_path = "src"
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["pandera.*", "duckdb.*", "sklearn.*", "lifelines.*", "scipy.*", "joblib.*", "confluent_kafka.*", "boto3.*", "botocore.*", "moto.*"]
+module = ["pandera.*", "duckdb.*", "sklearn.*", "lifelines.*", "scipy.*", "joblib.*", "confluent_kafka.*", "boto3.*", "botocore.*", "moto.*", "anthropic.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
